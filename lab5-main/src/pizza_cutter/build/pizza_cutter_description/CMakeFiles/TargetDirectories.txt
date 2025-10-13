@@ -1,0 +1,9 @@
+/home/asad/mtrn4231/lab5-main/src/pizza_cutter/build/pizza_cutter_description/CMakeFiles/uninstall.dir
+/home/asad/mtrn4231/lab5-main/src/pizza_cutter/build/pizza_cutter_description/CMakeFiles/pizza_cutter_description_uninstall.dir
+/home/asad/mtrn4231/lab5-main/src/pizza_cutter/build/pizza_cutter_description/CMakeFiles/test.dir
+/home/asad/mtrn4231/lab5-main/src/pizza_cutter/build/pizza_cutter_description/CMakeFiles/edit_cache.dir
+/home/asad/mtrn4231/lab5-main/src/pizza_cutter/build/pizza_cutter_description/CMakeFiles/rebuild_cache.dir
+/home/asad/mtrn4231/lab5-main/src/pizza_cutter/build/pizza_cutter_description/CMakeFiles/list_install_components.dir
+/home/asad/mtrn4231/lab5-main/src/pizza_cutter/build/pizza_cutter_description/CMakeFiles/install.dir
+/home/asad/mtrn4231/lab5-main/src/pizza_cutter/build/pizza_cutter_description/CMakeFiles/install/local.dir
+/home/asad/mtrn4231/lab5-main/src/pizza_cutter/build/pizza_cutter_description/CMakeFiles/install/strip.dir

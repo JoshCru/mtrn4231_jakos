@@ -1,0 +1,189 @@
+<?xml version="1.0" ?>
+<!-- 
+  urdf.xacro file extension indicates that this urdf file should not be directly used but included in another urdf file.
+
+  The robot links and joints are encapsulated within a xacro:macro element which takes in prefix, parent, and origin arguments.
+
+ -->
+
+<!-- The name of the robot is given here. xmlns:xacro is mandatory for xacro files. -->
+<robot name="claw" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!--
+    This is the start of a macro block called "claw".
+  
+    The macro block takes in 3 arguments:
+      - prefix is literally a prefix or "namespace within the string". Prevents name clashes.
+      - parent is the name of the parent link of the claw.
+      - *origin is the tag for the origin.
+
+    * denotes that the variable is a tag. Literally <origin xyz=... />
+  -->
+  <xacro:macro name="claw" params="prefix parent *origin">
+
+    <!-- This joint fixes the claw to an external parent link (could be the world or another robot). -->
+    <joint name="${prefix}claw_flange" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${prefix}base_link"/>
+
+      <!-- xacro:insert_block means place the tag here. Specify the positional relationship between parent and child links. -->
+      <xacro:insert_block name="origin"/>
+    </joint>
+
+    <!-- Define a link for mesh base_link.STL. -->
+    <link name="${prefix}base_link">
+
+      <!-- Defines what the link looks like. -->
+      <visual>
+
+        <!-- Shape of object. -->
+        <geometry>
+          <mesh filename="package://claw_description/meshes/base_link.STL"/>
+        </geometry>
+
+        <!-- Origin of the visual element. xyz is in metres. rpy stands for roll pitch yaw in radians. -->
+        <origin xyz="0 0 0.025" rpy="1.5707963 0 0"/>
+      </visual>
+
+      <!-- Defines the collision boundaries. -->
+      <collision>
+
+        <!-- Shape of object. -->
+        <geometry>
+          <mesh filename="package://claw_description/meshes/base_link.STL"/>
+        </geometry>
+
+        <!-- Collision origin is usually the same as the visual origin. -->
+        <origin xyz="0 0 0.025" rpy="1.5707963 0 0"/>
+      </collision>
+
+      <!--
+        Defines the inertial properties of the link.
+        
+        If this block is not defined, everything defaults to zero. However, Gazebo will not render the link if inertia values are zero.
+      
+       -->
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="0.268"/>
+        <inertia
+          ixx="1.0" ixy="0.0" ixz="0.0"
+          iyy="1.0" iyz="0.0"
+          izz="1.0"/>
+      </inertial>
+    </link>
+
+    <!--
+      Defines a joint between base_link and claw1.
+
+      Continuous or revolute joint can be used but revoluate is more appropriate because it has bounds.
+
+      To find out the other types of joints: http://wiki.ros.org/urdf/XML/joint#Attributes
+
+    -->
+    <joint name="${prefix}joint1" type="revolute">
+
+      <!-- Origin of the joint which also defines how the 2 links are relative to each other. -->
+      <origin xyz="0.05251 -0.010729 -0.0375" rpy="-1.5708 ${pi} 3.1416"/>
+      <parent link="${prefix}base_link"/>
+      <child link="${prefix}claw1"/>
+
+      <!-- Which axis is the continuous joint about. -->
+      <axis xyz="0 0 1"/>
+
+      <!-- Add damping and friction coefficients to this joint. -->
+      <dynamics damping="0.1" friction="0.1"/>
+
+      <!-- Set limits. -->
+      <limit lower="0" upper="${pi}" effort="10" velocity="10" />
+    </joint>
+
+    <!-- Doesn't matter if we define this as continuous joint because it will mimic joint1. -->
+    <joint name="${prefix}joint2" type="continuous">
+      <parent link="${prefix}base_link"/>
+      <child link="${prefix}claw2"/>
+      <axis xyz="0 0 1"/>
+      <origin xyz="-0.01693 0.050862 -0.0375" rpy="-1.5708 ${pi} -1.0472"/>
+      <mimic joint="joint1" multiplier="1" offset="0"/>
+    </joint>
+
+    <joint name="${prefix}joint3" type="continuous">
+      <parent link="${prefix}base_link"/>
+      <child link="${prefix}claw3"/>
+      <axis xyz="0 0 1"/>
+      <origin xyz="-0.03555 -0.040071 -0.0375" rpy="-1.5708 ${pi} 1.0472"/>
+      <mimic joint="joint1" multiplier="1" offset="0"/>
+    </joint>
+
+    <link name="${prefix}claw1">
+      <visual>
+        <geometry>
+          <mesh filename="package://claw_description/meshes/claw1.STL"/>
+        </geometry>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+      </visual>
+      <collision>
+        <geometry>
+          <mesh filename="package://claw_description/meshes/claw1.STL"/>
+        </geometry>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+      </collision>
+
+      <inertial>
+        <origin xyz="-0.0185468224648669 0.110151443507784 -0.0107513372089238" rpy="0 0 0"/>
+        <mass value="0.105"/>
+        <inertia
+          ixx="1.0" ixy="0.0" ixz="0.0"
+          iyy="1.0" iyz="0.0"
+          izz="1.0"/>
+      </inertial>
+    </link>
+
+    <link name="${prefix}claw2">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://claw_description/meshes/claw2.STL"/>
+        </geometry>
+      </visual>
+      <collision>
+        <geometry>
+          <mesh filename="package://claw_description/meshes/claw2.STL"/>
+        </geometry>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+      </collision>
+      <inertial>
+        <origin xyz="-0.0185453798911736 0.110154432687198 -0.0107488890606977" rpy="0 0 0"/>
+        <mass value="0.105"/>
+        <inertia
+          ixx="1.0" ixy="0.0" ixz="0.0"
+          iyy="1.0" iyz="0.0"
+          izz="1.0"/>
+      </inertial>
+    </link>
+
+    <link name="${prefix}claw3">
+      <visual>
+        <geometry>
+          <mesh filename="package://claw_description/meshes/claw3.STL"/>
+        </geometry>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+      </visual>
+      <collision>
+        <geometry>
+          <mesh filename="package://claw_description/meshes/claw3.STL"/>
+        </geometry>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+      </collision>
+      <inertial>
+        <origin xyz="-0.0185427568586984 0.110154942459749 -0.0107492179371289" rpy="0 0 0"/>
+        <mass value="0.105"/>
+        <inertia
+          ixx="1.0" ixy="0.0" ixz="0.0"
+          iyy="1.0" iyz="0.0"
+          izz="1.0"/>
+      </inertial>
+    </link>
+
+  </xacro:macro>
+</robot>

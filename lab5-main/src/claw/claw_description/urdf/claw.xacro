@@ -1,0 +1,18 @@
+<?xml version="1.0" ?>
+<!-- The purpose of this file is to fix the claw to some abstract link so the claw can be used in the world. -->
+
+<robot name="claw" xmlns:xacro="http://ros.org/wiki/xacro">
+  <!-- Including the claw.urdf.xacro file to give scope to xacro:claw. Inclusion is a simple copy-and-paste of code. -->
+  <xacro:include filename="$(find claw_description)/urdf/claw.urdf.xacro" />
+
+  <!-- This is the abstract link which the base of the claw attaches to. -->
+  <link name="claw_root_link" />
+  
+  <!-- Instantiate the claw by using its macro. -->
+  <xacro:claw prefix="" parent="claw_root_link" >
+
+    <!-- Note that we are passing in a tag as an argument. -->
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </xacro:claw>
+
+</robot>
