@@ -1,0 +1,10 @@
+# Calibrate gripper and weight sensor
+bool calibrate_position
+bool calibrate_force
+bool tare_weight_sensor
+---
+bool success
+float32 min_position
+float32 max_position
+float32 zero_force_offset
+string message

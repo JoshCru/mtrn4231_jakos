@@ -1,0 +1,28 @@
+rgbd_camera_node:
+  ros__parameters:
+    camera_name: "realsense"
+    frame_id: "camera_link"
+    publish_rate: 30.0
+    image_width: 640
+    image_height: 480
+
+opencv_processor_node:
+  ros__parameters:
+    min_object_area: 1000
+    max_object_area: 50000
+    confidence_threshold: 0.5
+    debug_visualization: true
+
+pointcloud_processor_node:
+  ros__parameters:
+    min_cluster_size: 100
+    max_cluster_size: 10000
+    cluster_tolerance: 0.02
+
+    # Workspace limits (in meters)
+    workspace_min_x: -0.5
+    workspace_max_x: 0.5
+    workspace_min_y: -0.5
+    workspace_max_y: 0.5
+    workspace_min_z: 0.0
+    workspace_max_z: 0.5

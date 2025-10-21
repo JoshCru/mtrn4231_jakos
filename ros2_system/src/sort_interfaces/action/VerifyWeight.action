@@ -1,0 +1,16 @@
+# Goal
+uint32 object_id
+float32 estimated_weight
+float32 tolerance  # percentage (e.g., 0.10 for 10%)
+
+---
+# Result
+bool verified
+float32 actual_weight
+float32 error_percentage
+string message
+
+---
+# Feedback
+string current_state
+float32 measurement_progress

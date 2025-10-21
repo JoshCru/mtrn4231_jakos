@@ -1,0 +1,6 @@
+# Validate workspace safety
+geometry_msgs/Pose[] planned_waypoints
+---
+bool is_safe
+string[] warnings
+geometry_msgs/Point[] collision_points

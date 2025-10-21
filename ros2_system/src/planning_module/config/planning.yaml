@@ -1,0 +1,31 @@
+sort_node:
+  ros__parameters:
+    sorting_strategy: "weight_based"  # weight_based, random, sequential
+    weight_tolerance: 10.0  # percentage
+
+verification_node:
+  ros__parameters:
+    default_tolerance: 10.0  # percentage
+    measurement_duration: 2.0  # seconds
+    filter_window_size: 10
+
+integrity_node:
+  ros__parameters:
+    check_rate: 10.0  # Hz
+    workspace_min_x: -0.6
+    workspace_max_x: 0.6
+    workspace_min_y: -0.6
+    workspace_max_y: 0.6
+    workspace_min_z: 0.0
+    workspace_max_z: 0.6
+    obstacle_detection_threshold: 0.05  # meters
+    enable_collision_checking: true
+
+moveit2_interface_node:
+  ros__parameters:
+    planning_group: "ur_manipulator"
+    end_effector_link: "tool0"
+    reference_frame: "base_link"
+    default_planning_time: 5.0  # seconds
+    default_velocity_scaling: 0.5
+    default_acceleration_scaling: 0.5

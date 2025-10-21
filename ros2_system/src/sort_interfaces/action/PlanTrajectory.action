@@ -1,0 +1,16 @@
+# Goal
+geometry_msgs/Pose target_pose
+string planning_group
+float32 planning_time  # seconds
+bool avoid_collisions
+
+---
+# Result
+bool success
+moveit_msgs/RobotTrajectory trajectory
+string message
+
+---
+# Feedback
+string current_state
+float32 planning_progress

@@ -1,0 +1,15 @@
+# Goal
+uint32 object_id
+geometry_msgs/Pose target_pose
+float32 approach_distance  # meters
+
+---
+# Result
+bool success
+float32 actual_weight  # grams
+string message
+
+---
+# Feedback
+string current_state  # "approaching", "grasping", "lifting", "measuring"
+float32 progress  # 0.0 to 1.0

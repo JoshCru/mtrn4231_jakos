@@ -1,0 +1,14 @@
+# Goal
+uint32 object_id
+geometry_msgs/Pose target_pose
+float32 retreat_distance  # meters
+
+---
+# Result
+bool success
+string message
+
+---
+# Feedback
+string current_state  # "approaching", "placing", "releasing", "retreating"
+float32 progress  # 0.0 to 1.0

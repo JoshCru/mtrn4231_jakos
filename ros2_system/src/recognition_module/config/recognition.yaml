@@ -1,0 +1,13 @@
+weight_estimation_node:
+  ros__parameters:
+    default_density: 1.0  # g/cm³
+    min_confidence: 0.3
+    max_confidence: 0.9
+    use_ml_model: false
+
+    # Material densities (g/cm³)
+    density_plastic: 0.95
+    density_wood: 0.6
+    density_metal: 7.8
+    density_glass: 2.5
+    density_paper: 0.7

@@ -1,0 +1,5 @@
+# System control service
+string command  # "start", "stop", "pause", "resume", "emergency_stop"
+---
+bool success
+string message
