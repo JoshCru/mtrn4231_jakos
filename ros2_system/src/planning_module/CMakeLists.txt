@@ -77,7 +77,27 @@ install(DIRECTORY
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
+  find_package(ament_cmake_pytest REQUIRED)
+
+  # Linting
   ament_lint_auto_find_test_dependencies()
+
+  # Integration tests
+  ament_add_pytest_test(test_sort_node test/test_sort_node.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(test_verification_node test/test_verification_node.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(test_integrity_node test/test_integrity_node.py
+    TIMEOUT 60
+  )
+
+  ament_add_pytest_test(test_moveit2_interface_node test/test_moveit2_interface_node.py
+    TIMEOUT 60
+  )
 endif()
 
 ament_package()
