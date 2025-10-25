@@ -12,10 +12,15 @@
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
   <depend>sort_interfaces</depend>
+  <depend>pcl_conversions</depend>
+  <depend>pcl_ros</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <test_depend>python3-pytest</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

@@ -1,13 +1,31 @@
-weight_estimation_node:
+recognition_node:
   ros__parameters:
-    default_density: 1.0  # g/cm³
-    min_confidence: 0.3
-    max_confidence: 0.9
-    use_ml_model: false
+    # Material properties
+    material_density: 8000.0       # kg/m³ (stainless steel 316)
 
-    # Material densities (g/cm³)
-    density_plastic: 0.95
-    density_wood: 0.6
-    density_metal: 7.8
-    density_glass: 2.5
-    density_paper: 0.7
+    # Clustering parameters
+    min_cluster_size: 100          # Minimum points per object
+    max_cluster_size: 10000        # Maximum points per object
+    cluster_tolerance: 0.02        # Euclidean distance threshold (m) - 2cm
+
+    # Point cloud processing
+    voxel_size: 0.005              # Voxel grid leaf size (m) - 5mm downsampling
+
+    # Workspace limits (matches integrity node)
+    workspace_min_x: -0.6          # meters
+    workspace_max_x: 0.6
+    workspace_min_y: -0.6
+    workspace_max_y: 0.6
+    workspace_min_z: 0.0           # Table surface at z=0
+    workspace_max_z: 0.6
+
+    # Confidence threshold
+    confidence_threshold: 0.5      # Minimum confidence to publish estimate
+
+mock_camera_node:
+  ros__parameters:
+    publish_rate: 1.0              # Hz - how often to publish point clouds
+    frame_id: "camera_link"        # TF frame for point cloud
+    num_objects: 3                 # Number of mock objects to generate
+    add_noise: true                # Add gaussian noise to simulate sensor noise
+    noise_stddev: 0.002            # Standard deviation of noise (m) - 2mm
