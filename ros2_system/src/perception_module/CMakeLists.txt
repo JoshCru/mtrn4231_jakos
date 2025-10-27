@@ -18,12 +18,16 @@ find_package(visualization_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(sort_interfaces REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(rosbag2_cpp REQUIRED)
+find_package(rosbag2_storage REQUIRED)
 
 # rgbd_camera_node executable
 add_executable(rgbd_camera_node src/rgbd_camera_node.cpp)
 ament_target_dependencies(rgbd_camera_node
   rclcpp
   sensor_msgs
+  rosbag2_cpp
+  rosbag2_storage
 )
 
 # opencv_processor_node executable

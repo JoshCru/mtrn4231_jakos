@@ -8,11 +8,19 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <std_msgs/msg/header.hpp>
+#include <rosbag2_cpp/writer.hpp>
+#include <rosbag2_cpp/writers/sequential_writer.hpp>
+#include <rosbag2_storage/storage_options.hpp>
+#include <rclcpp/serialization.hpp>
+#include <filesystem>
+#include <sstream>
+#include <chrono>
+#include <memory>
 
 class RGBDCameraNode : public rclcpp::Node
 {
 public:
-    RGBDCameraNode() : Node("rgbd_camera_node"), frame_count_(0)
+    RGBDCameraNode() : Node("rgbd_camera_node"), frame_count_(0), recording_enabled_(false)
     {
         // Declare parameters
         this->declare_parameter("camera_name", "camera");
@@ -20,6 +28,8 @@ public:
         this->declare_parameter("publish_rate", 30.0);
         this->declare_parameter("image_width", 640);
         this->declare_parameter("image_height", 480);
+        this->declare_parameter("enable_recording", false);
+        this->declare_parameter("bag_path", "");
 
         // Get parameters
         camera_name_ = this->get_parameter("camera_name").as_string();
@@ -27,6 +37,8 @@ public:
         double publish_rate = this->get_parameter("publish_rate").as_double();
         image_width_ = this->get_parameter("image_width").as_int();
         image_height_ = this->get_parameter("image_height").as_int();
+        recording_enabled_ = this->get_parameter("enable_recording").as_bool();
+        std::string bag_path = this->get_parameter("bag_path").as_string();
 
         // Publishers
         color_image_pub_ = this->create_publisher<sensor_msgs::msg::Image>(
@@ -37,6 +49,58 @@ public:
             "/camera/pointcloud", 10);
         camera_info_pub_ = this->create_publisher<sensor_msgs::msg::CameraInfo>(
             "/camera/color/camera_info", 10);
+
+        // Initialize bag recording if enabled
+        if (recording_enabled_) {
+            if (bag_path.empty()) {
+                // Generate default bag path with timestamp
+                auto now = std::chrono::system_clock::now();
+                auto timestamp = std::chrono::system_clock::to_time_t(now);
+                std::stringstream ss;
+                ss << "rgbd_camera_" << timestamp;
+                bag_path = ss.str();
+            }
+
+            try {
+                bag_writer_ = std::make_unique<rosbag2_cpp::Writer>();
+
+                rosbag2_storage::StorageOptions storage_options;
+                storage_options.uri = bag_path;
+                storage_options.storage_id = "sqlite3";
+
+                rosbag2_cpp::ConverterOptions converter_options;
+                converter_options.input_serialization_format = "cdr";
+                converter_options.output_serialization_format = "cdr";
+
+                bag_writer_->open(storage_options, converter_options);
+
+                // Create topic metadata for RGB image
+                rosbag2_storage::TopicMetadata color_topic_metadata;
+                color_topic_metadata.name = "/camera/color/image_raw";
+                color_topic_metadata.type = "sensor_msgs/msg/Image";
+                color_topic_metadata.serialization_format = "cdr";
+                bag_writer_->create_topic(color_topic_metadata);
+
+                // Create topic metadata for depth image
+                rosbag2_storage::TopicMetadata depth_topic_metadata;
+                depth_topic_metadata.name = "/camera/depth/image_raw";
+                depth_topic_metadata.type = "sensor_msgs/msg/Image";
+                depth_topic_metadata.serialization_format = "cdr";
+                bag_writer_->create_topic(depth_topic_metadata);
+
+                // Create topic metadata for camera info
+                rosbag2_storage::TopicMetadata info_topic_metadata;
+                info_topic_metadata.name = "/camera/color/camera_info";
+                info_topic_metadata.type = "sensor_msgs/msg/CameraInfo";
+                info_topic_metadata.serialization_format = "cdr";
+                bag_writer_->create_topic(info_topic_metadata);
+
+                RCLCPP_INFO(this->get_logger(), "Recording enabled - saving to: %s", bag_path.c_str());
+            } catch (const std::exception& e) {
+                RCLCPP_ERROR(this->get_logger(), "Failed to initialize bag recording: %s", e.what());
+                recording_enabled_ = false;
+            }
+        }
 
         // Timer for publishing
         timer_ = this->create_wall_timer(
@@ -52,6 +116,14 @@ public:
                    "TODO: Initialize actual camera hardware interface");
     }
 
+    ~RGBDCameraNode()
+    {
+        if (recording_enabled_ && bag_writer_) {
+            RCLCPP_INFO(this->get_logger(), "Closing bag file...");
+            bag_writer_.reset();
+        }
+    }
+
 private:
     void timer_callback()
     {
@@ -63,10 +135,16 @@ private:
         // Publish color image
         auto color_msg = create_dummy_color_image(timestamp);
         color_image_pub_->publish(color_msg);
+        if (recording_enabled_ && bag_writer_) {
+            write_message_to_bag("/camera/color/image_raw", color_msg, timestamp);
+        }
 
         // Publish depth image
         auto depth_msg = create_dummy_depth_image(timestamp);
         depth_image_pub_->publish(depth_msg);
+        if (recording_enabled_ && bag_writer_) {
+            write_message_to_bag("/camera/depth/image_raw", depth_msg, timestamp);
+        }
 
         // Publish point cloud
         auto pc_msg = create_dummy_pointcloud(timestamp);
@@ -75,11 +153,45 @@ private:
         // Publish camera info
         auto info_msg = create_camera_info(timestamp);
         camera_info_pub_->publish(info_msg);
+        if (recording_enabled_ && bag_writer_) {
+            write_message_to_bag("/camera/color/camera_info", info_msg, timestamp);
+        }
 
         frame_count_++;
 
         if (frame_count_ % 100 == 0) {
             RCLCPP_DEBUG(this->get_logger(), "Published frame %lu", frame_count_);
+        }
+    }
+
+    template<typename MessageT>
+    void write_message_to_bag(const std::string& topic_name, const MessageT& msg, rclcpp::Time timestamp)
+    {
+        try {
+            rclcpp::SerializedMessage serialized_msg;
+            rclcpp::Serialization<MessageT> serialization;
+            serialization.serialize_message(&msg, &serialized_msg);
+
+            auto bag_message = std::make_shared<rosbag2_storage::SerializedBagMessage>();
+            bag_message->topic_name = topic_name;
+            bag_message->time_stamp = timestamp.nanoseconds();
+            bag_message->serialized_data = std::shared_ptr<rcutils_uint8_array_t>(
+                new rcutils_uint8_array_t,
+                [](rcutils_uint8_array_t* data) {
+                    if (data) {
+                        auto ret = rcutils_uint8_array_fini(data);
+                        (void)ret;  // Ignore return value
+                        delete data;
+                    }
+                }
+            );
+
+            *bag_message->serialized_data = serialized_msg.release_rcl_serialized_message();
+
+            bag_writer_->write(bag_message);
+        } catch (const std::exception& e) {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                "Failed to write message to bag: %s", e.what());
         }
     }
 
@@ -183,6 +295,10 @@ private:
     int image_width_;
     int image_height_;
     size_t frame_count_;
+
+    // Bag recording
+    std::unique_ptr<rosbag2_cpp::Writer> bag_writer_;
+    bool recording_enabled_;
 };
 
 int main(int argc, char** argv)
