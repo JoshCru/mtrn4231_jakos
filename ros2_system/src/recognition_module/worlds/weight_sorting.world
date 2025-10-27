@@ -1,0 +1,106 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="weight_sorting">
+
+    <!-- Physics settings -->
+    <physics type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+
+    <!-- Lighting -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <!-- Ground plane -->
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <!-- Workspace table -->
+    <model name="workspace_table">
+      <static>true</static>
+      <pose>0 0 0 0 0 0</pose>
+      <link name="table_link">
+        <visual name="table_surface">
+          <pose>0 0 -0.025 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>1.2 1.2 0.05</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+        <collision name="table_collision">
+          <pose>0 0 -0.025 0 0 0</pose>
+          <geometry>
+            <box>
+              <size>1.2 1.2 0.05</size>
+            </box>
+          </geometry>
+        </collision>
+      </link>
+    </model>
+
+    <!-- Depth Camera mounted above workspace -->
+    <model name="depth_camera">
+      <static>true</static>
+      <pose>0 0 0.8 0 1.57079632679 0</pose>
+      <link name="camera_link">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.02 0.1 0.02</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0 0 0 1</ambient>
+            <diffuse>0 0 0 1</diffuse>
+          </material>
+        </visual>
+
+        <sensor name="depth_camera_sensor" type="depth">
+          <update_rate>10</update_rate>
+          <camera>
+            <horizontal_fov>1.047</horizontal_fov>
+            <image>
+              <width>640</width>
+              <height>480</height>
+              <format>R8G8B8</format>
+            </image>
+            <clip>
+              <near>0.1</near>
+              <far>10</far>
+            </clip>
+            <depth_camera>
+              <output>depths</output>
+            </depth_camera>
+          </camera>
+
+          <plugin name="depth_camera_plugin" filename="libgazebo_ros_camera.so">
+            <ros>
+              <namespace>/camera</namespace>
+              <remapping>depth_camera/image_raw:=image_raw</remapping>
+              <remapping>depth_camera/image_raw/camera_info:=camera_info</remapping>
+              <remapping>depth_camera/depth/image_raw:=depth/image_raw</remapping>
+              <remapping>depth_camera/depth/camera_info:=depth/camera_info</remapping>
+              <remapping>depth_camera/points:=pointcloud</remapping>
+            </ros>
+            <camera_name>depth_camera</camera_name>
+            <frame_name>camera_link</frame_name>
+            <hack_baseline>0.07</hack_baseline>
+            <min_depth>0.1</min_depth>
+            <max_depth>10.0</max_depth>
+          </plugin>
+        </sensor>
+      </link>
+    </model>
+
+  </world>
+</sdf>

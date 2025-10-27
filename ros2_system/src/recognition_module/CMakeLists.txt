@@ -74,6 +74,21 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}
 )
 
+# Install Gazebo worlds and models
+install(DIRECTORY
+  worlds
+  models
+  DESTINATION share/${PROJECT_NAME}
+)
+
+# Install scripts
+install(PROGRAMS
+  scripts/spawn_objects.py
+  scripts/record_bag.py
+  scripts/record_test_data.sh
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   find_package(ament_cmake_pytest REQUIRED)
