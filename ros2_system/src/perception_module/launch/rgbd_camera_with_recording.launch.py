@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
 Launch file for RGBD camera node with bag recording enabled
+
+This launch file starts the rgbd_camera_node which subscribes to
+RealSense camera topics and optionally records them to a ROS bag.
 """
 from launch import LaunchDescription
 from launch_ros.actions import Node
@@ -34,22 +37,28 @@ def generate_launch_description():
         description='Path to save ROS bag'
     )
 
-    publish_rate_arg = DeclareLaunchArgument(
-        'publish_rate',
-        default_value='30.0',
-        description='Camera publish rate in Hz'
+    color_topic_arg = DeclareLaunchArgument(
+        'color_topic',
+        default_value='/camera/color/image_raw',
+        description='Topic name for color/RGB images'
     )
 
-    image_width_arg = DeclareLaunchArgument(
-        'image_width',
-        default_value='640',
-        description='Image width in pixels'
+    depth_topic_arg = DeclareLaunchArgument(
+        'depth_topic',
+        default_value='/camera/depth/image_raw',
+        description='Topic name for depth images'
     )
 
-    image_height_arg = DeclareLaunchArgument(
-        'image_height',
-        default_value='480',
-        description='Image height in pixels'
+    color_info_topic_arg = DeclareLaunchArgument(
+        'color_info_topic',
+        default_value='/camera/color/camera_info',
+        description='Topic name for color camera info'
+    )
+
+    depth_info_topic_arg = DeclareLaunchArgument(
+        'depth_info_topic',
+        default_value='/camera/depth/camera_info',
+        description='Topic name for depth camera info'
     )
 
     # RGBD Camera Node
@@ -61,9 +70,10 @@ def generate_launch_description():
         parameters=[{
             'enable_recording': LaunchConfiguration('enable_recording'),
             'bag_path': LaunchConfiguration('bag_path'),
-            'publish_rate': LaunchConfiguration('publish_rate'),
-            'image_width': LaunchConfiguration('image_width'),
-            'image_height': LaunchConfiguration('image_height'),
+            'color_topic': LaunchConfiguration('color_topic'),
+            'depth_topic': LaunchConfiguration('depth_topic'),
+            'color_info_topic': LaunchConfiguration('color_info_topic'),
+            'depth_info_topic': LaunchConfiguration('depth_info_topic'),
         }],
         emulate_tty=True
     )
@@ -71,8 +81,9 @@ def generate_launch_description():
     return LaunchDescription([
         enable_recording_arg,
         bag_path_arg,
-        publish_rate_arg,
-        image_width_arg,
-        image_height_arg,
+        color_topic_arg,
+        depth_topic_arg,
+        color_info_topic_arg,
+        depth_info_topic_arg,
         rgbd_camera_node,
     ])
