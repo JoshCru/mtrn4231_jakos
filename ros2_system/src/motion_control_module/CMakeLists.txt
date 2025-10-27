@@ -19,6 +19,9 @@ find_package(sort_interfaces REQUIRED)
 
 # gripper_controller_node executable (lifecycle node)
 add_executable(gripper_controller_node src/gripper_controller_node.cpp)
+target_include_directories(gripper_controller_node PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 ament_target_dependencies(gripper_controller_node
   rclcpp
   rclcpp_lifecycle

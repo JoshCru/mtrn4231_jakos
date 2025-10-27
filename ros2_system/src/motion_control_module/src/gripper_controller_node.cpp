@@ -1,6 +1,6 @@
 /**
  * @file gripper_controller_node.cpp
- * @brief Arduino servo gripper controller with weight sensing (lifecycle node)
+ * @brief Teensy 4.1 servo gripper controller with weight sensing (lifecycle node)
  */
 
 #include <rclcpp/rclcpp.hpp>
@@ -12,9 +12,11 @@
 #include "sort_interfaces/srv/calibrate_gripper.hpp"
 #include <vector>
 #include <deque>
+#include <memory>
+#include <chrono>
+#include <thread>
 
-// TODO: Include serial library for Arduino communication
-// #include <serial/serial.h>
+#include "simple_serial.hpp"
 
 using LifecycleNode = rclcpp_lifecycle::LifecycleNode;
 using LifecycleCallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
@@ -25,7 +27,8 @@ public:
     GripperControllerNode() : LifecycleNode("gripper_controller_node")
     {
         // Declare parameters
-        this->declare_parameter("serial_port", "/dev/ttyACM0");
+        this->declare_parameter("simulation_mode", false);  // NEW: Enable simulation without hardware
+        this->declare_parameter("serial_port", "/dev/ttyACM0");  // Linux: /dev/ttyACM0, macOS: /dev/cu.usbmodem*
         this->declare_parameter("baud_rate", 115200);
         this->declare_parameter("publish_rate", 20.0);  // Hz
         this->declare_parameter("force_sensor_pin", "A0");
@@ -48,6 +51,7 @@ public:
         RCLCPP_INFO(this->get_logger(), "Configuring...");
 
         // Get parameters
+        simulation_mode_ = this->get_parameter("simulation_mode").as_bool();
         serial_port_ = this->get_parameter("serial_port").as_string();
         baud_rate_ = this->get_parameter("baud_rate").as_int();
         double publish_rate = this->get_parameter("publish_rate").as_double();
@@ -87,21 +91,26 @@ public:
             std::chrono::milliseconds(static_cast<int>(1000.0 / publish_rate)),
             std::bind(&GripperControllerNode::timer_callback, this));
 
-        RCLCPP_INFO(this->get_logger(), "Serial port: %s @ %d baud", serial_port_.c_str(), baud_rate_);
-        RCLCPP_WARN(this->get_logger(),
-                   "TODO: Initialize serial connection to Arduino");
-
-        // TODO: Open serial port
-        // try {
-        //     serial_ = std::make_unique<serial::Serial>(serial_port_, baud_rate_,
-        //                                                serial::Timeout::simpleTimeout(1000));
-        //     if (serial_->isOpen()) {
-        //         RCLCPP_INFO(this->get_logger(), "Serial port opened successfully");
-        //     }
-        // } catch (serial::IOException& e) {
-        //     RCLCPP_ERROR(this->get_logger(), "Failed to open serial port: %s", e.what());
-        //     return LifecycleCallbackReturn::FAILURE;
-        // }
+        // Open serial port (if not in simulation mode)
+        if (!simulation_mode_) {
+            RCLCPP_INFO(this->get_logger(), "Hardware mode: Opening serial port %s @ %d baud",
+                       serial_port_.c_str(), baud_rate_);
+            try {
+                serial_ = std::make_unique<SimpleSerial>();
+                serial_->open(serial_port_, baud_rate_);
+                if (serial_->isOpen()) {
+                    RCLCPP_INFO(this->get_logger(), "Serial port opened successfully");
+                    // Give Teensy time to reset after serial connection
+                    std::this_thread::sleep_for(std::chrono::seconds(2));
+                }
+            } catch (const std::exception& e) {
+                RCLCPP_ERROR(this->get_logger(), "Failed to open serial port: %s", e.what());
+                RCLCPP_WARN(this->get_logger(), "Falling back to simulation mode");
+                simulation_mode_ = true;
+            }
+        } else {
+            RCLCPP_INFO(this->get_logger(), "Simulation mode: No hardware connection");
+        }
 
         current_position_ = 0.0f;
         is_configured_ = true;
@@ -114,8 +123,7 @@ public:
         (void)previous_state;
         RCLCPP_INFO(this->get_logger(), "Activating...");
 
-        // TODO: Send initialization commands to Arduino
-        // Example: Reset servo to neutral position
+        // Send initialization command: Reset servo to open position
         send_gripper_command(0.0f);
 
         is_active_ = true;
@@ -131,7 +139,7 @@ public:
 
         is_active_ = false;
 
-        // TODO: Send safe state command to Arduino (e.g., open gripper)
+        // Send safe state command (open gripper)
         send_gripper_command(0.0f);
 
         RCLCPP_INFO(this->get_logger(), "Gripper controller deactivated");
@@ -143,10 +151,12 @@ public:
         (void)previous_state;
         RCLCPP_INFO(this->get_logger(), "Cleaning up...");
 
-        // TODO: Close serial port
-        // if (serial_ && serial_->isOpen()) {
-        //     serial_->close();
-        // }
+        // Close serial port
+        if (serial_ && serial_->isOpen()) {
+            serial_->close();
+            RCLCPP_INFO(this->get_logger(), "Serial port closed");
+        }
+        serial_.reset();
 
         timer_.reset();
         is_configured_ = false;
@@ -231,34 +241,44 @@ private:
     {
         current_position_ = position;
 
-        // TODO: Send command to Arduino via serial
-        // Protocol example: "G<angle>\n" where angle = position * 180
+        // Send command to Teensy via serial
+        // Protocol: "G<angle>\n" where angle = position * 180
         int angle = static_cast<int>(position * 180.0f);
-
         std::string command = "G" + std::to_string(angle) + "\n";
 
-        RCLCPP_DEBUG(this->get_logger(), "Sending to Arduino: %s", command.c_str());
-
-        // if (serial_ && serial_->isOpen()) {
-        //     serial_->write(command);
-        // } else {
-        //     RCLCPP_WARN(this->get_logger(), "Serial port not open");
-        // }
+        if (!simulation_mode_ && serial_ && serial_->isOpen()) {
+            try {
+                serial_->write(command);
+                RCLCPP_DEBUG(this->get_logger(), "Sent to Teensy: %s", command.c_str());
+            } catch (const std::exception& e) {
+                RCLCPP_WARN(this->get_logger(), "Failed to send command: %s", e.what());
+            }
+        } else {
+            RCLCPP_DEBUG(this->get_logger(), "Simulation: Gripper command %.2f (angle: %d)", position, angle);
+        }
     }
 
     float read_force_sensor()
     {
-        // TODO: Read from Arduino via serial
-        // Protocol example: Arduino sends "W<value>\n" where value is ADC reading
+        if (!simulation_mode_ && serial_ && serial_->isOpen()) {
+            // Read from Teensy via serial
+            // Protocol: Teensy sends "W<value>\n" where value is weight in grams
+            try {
+                if (serial_->available() > 0) {
+                    std::string response = serial_->readline(50); // 50ms timeout
+                    if (!response.empty() && response[0] == 'W') {
+                        float weight = std::stof(response.substr(1));
+                        RCLCPP_DEBUG(this->get_logger(), "Received from Teensy: %s (%.1fg)",
+                                    response.c_str(), weight);
+                        return weight;
+                    }
+                }
+            } catch (const std::exception& e) {
+                RCLCPP_DEBUG(this->get_logger(), "Error reading sensor: %s", e.what());
+            }
+        }
 
-        // if (serial_ && serial_->isOpen() && serial_->available()) {
-        //     std::string response = serial_->readline();
-        //     if (response[0] == 'W') {
-        //         return std::stof(response.substr(1));
-        //     }
-        // }
-
-        // Placeholder: return simulated weight based on gripper position
+        // Simulation mode: return simulated weight based on gripper position
         if (current_position_ > 0.5f) {
             return 150.0f + (rand() % 20 - 10);  // Simulated: 140-160 grams
         }
@@ -330,9 +350,11 @@ private:
 
     rclcpp::TimerBase::SharedPtr timer_;
 
-    // TODO: Serial port
-    // std::unique_ptr<serial::Serial> serial_;
+    // Serial port
+    std::unique_ptr<SimpleSerial> serial_;
 
+    // Parameters
+    bool simulation_mode_;
     std::string serial_port_;
     int baud_rate_;
     int filter_window_size_;
