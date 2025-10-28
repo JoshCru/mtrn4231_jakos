@@ -21,6 +21,7 @@
 #include <pcl/segmentation/extract_clusters.h>
 #include <pcl/surface/convex_hull.h>
 #include <pcl/common/centroid.h>
+#include <pcl/common/common.h>
 
 #include <vector>
 #include <string>
@@ -117,7 +118,12 @@ private:
     std::vector<pcl::PointIndices> cluster_indices;
     extract_clusters(cloud_downsampled, cluster_indices);
 
-    RCLCPP_INFO(this->get_logger(), "Found %zu object clusters", cluster_indices.size());
+    if (cluster_indices.empty()) {
+      RCLCPP_DEBUG(this->get_logger(), "No objects detected");
+      return;
+    }
+
+    RCLCPP_INFO(this->get_logger(), "Detected %zu object(s)", cluster_indices.size());
 
     // 4. Process each cluster
     for (const auto& indices : cluster_indices) {
@@ -202,11 +208,19 @@ private:
     Eigen::Vector4f centroid;
     pcl::compute3DCentroid(*cluster, centroid);
 
+    // Calculate bounding box (dimensions)
+    pcl::PointXYZRGB min_pt, max_pt;
+    pcl::getMinMax3D(*cluster, min_pt, max_pt);
+
+    double width = max_pt.x - min_pt.x;   // X dimension
+    double height = max_pt.y - min_pt.y;  // Y dimension
+    double depth = max_pt.z - min_pt.z;   // Z dimension (height above table)
+
     // Calculate volume using convex hull
     double volume = calculate_volume(cluster);
 
     if (volume <= 0.0) {
-      RCLCPP_WARN(this->get_logger(), "Invalid volume calculated, skipping cluster");
+      RCLCPP_WARN(this->get_logger(), "Invalid volume, skipping object");
       return;
     }
 
@@ -231,7 +245,7 @@ private:
     weight_msg.object_id = next_object_id_++;
     weight_msg.estimated_weight = weight_grams;
     weight_msg.confidence = confidence;
-    weight_msg.volume = volume;
+    weight_msg.volume = volume * 1e6;  // Convert m³ to cm³
 
     // Set position (centroid)
     weight_msg.pose.position.x = centroid[0];
@@ -244,16 +258,16 @@ private:
     weight_msg.pose.orientation.z = 0.0;
     weight_msg.pose.orientation.w = 1.0;
 
-    // Publish
+    // Publish to sort_node
     weight_pub_->publish(weight_msg);
 
+    // Simple, concise log output
     RCLCPP_INFO(this->get_logger(),
-                "Object %d: weight=%.2fg, volume=%.6fm³, pos=(%.3f, %.3f, %.3f), confidence=%.2f",
+                "  Object %u: %.1fg, %.1f×%.1f×%.1fcm @ (%.2f, %.2f, %.2f)",
                 weight_msg.object_id,
                 weight_grams,
-                volume,
-                centroid[0], centroid[1], centroid[2],
-                confidence);
+                width * 100.0, height * 100.0, depth * 100.0,
+                centroid[0], centroid[1], centroid[2]);
   }
 
   double calculate_volume(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cluster)
