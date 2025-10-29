@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>lab2_client_service</name>
+  <version>0.0.0</version>
+  <description>ROS 2 package for integer addition service and client</description>
+  <maintainer email="mitch.torok@gmail.com">Mitchell</maintainer>
+  <license>Apache License 2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>rclcpp</build_depend>
+  <build_depend>example_interfaces</build_depend>
+  <exec_depend>rclcpp</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
