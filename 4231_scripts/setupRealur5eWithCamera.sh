@@ -13,8 +13,8 @@ gnome-terminal -t "MoveitServer" -e 'bash -c "ros2 launch ur_moveit_config ur_mo
 sleep 5
 
 # Step 3: Launch RealSense camera with hand-eye calibration
-echo "Launching RealSense Camera and Perception..."
-gnome-terminal -t "Perception" -e 'bash -c "cd ~/Downloads/mtrn4231_jakos && ros2 launch 4231_scripts/add_perception_to_rviz.launch.py; exec bash"'
+echo "Launching RealSense Camera..."
+gnome-terminal -t "Camera" -e 'bash -c "cd ~/Downloads/mtrn4231_jakos && ros2 launch 4231_scripts/camera_only.launch.py; exec bash"'
 
 echo ""
 echo "============================================"
