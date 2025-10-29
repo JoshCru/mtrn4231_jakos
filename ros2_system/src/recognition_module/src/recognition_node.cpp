@@ -25,6 +25,30 @@
 
 #include <vector>
 #include <string>
+#include <map>
+#include <set>
+#include <cmath>
+#include <limits>
+
+// Struct to store tracked object information
+struct TrackedObject
+{
+  uint32_t id;
+  float weight;
+  Eigen::Vector3f position;
+  rclcpp::Time last_seen;
+  int consecutive_misses;
+};
+
+// Struct for detected objects in current frame
+struct DetectedObject
+{
+  Eigen::Vector3f position;
+  float weight;
+  float confidence;
+  geometry_msgs::msg::Pose pose;
+  float volume;
+};
 
 class RecognitionNode : public rclcpp::Node
 {
@@ -45,6 +69,12 @@ public:
     this->declare_parameter("workspace_max_z", 0.6);
     this->declare_parameter("confidence_threshold", 0.5);
 
+    // Object tracking parameters
+    this->declare_parameter("tracking_distance_threshold", 0.05);  // 5cm
+    this->declare_parameter("tracking_weight_threshold", 20.0);    // 20g
+    this->declare_parameter("tracking_timeout", 5.0);              // 5 seconds
+    this->declare_parameter("tracking_max_misses", 3);             // frames
+
     // Get parameters
     material_density_ = this->get_parameter("material_density").as_double();
     min_cluster_size_ = this->get_parameter("min_cluster_size").as_int();
@@ -58,6 +88,12 @@ public:
     workspace_min_z_ = this->get_parameter("workspace_min_z").as_double();
     workspace_max_z_ = this->get_parameter("workspace_max_z").as_double();
     confidence_threshold_ = this->get_parameter("confidence_threshold").as_double();
+
+    // Get tracking parameters
+    tracking_distance_threshold_ = this->get_parameter("tracking_distance_threshold").as_double();
+    tracking_weight_threshold_ = this->get_parameter("tracking_weight_threshold").as_double();
+    tracking_timeout_ = this->get_parameter("tracking_timeout").as_double();
+    tracking_max_misses_ = this->get_parameter("tracking_max_misses").as_int();
 
     // Subscriber to point cloud
     pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
@@ -79,6 +115,8 @@ public:
     RCLCPP_INFO(this->get_logger(), "Material density: %.2f kg/m³", material_density_);
     RCLCPP_INFO(this->get_logger(), "Cluster size: [%d, %d]", min_cluster_size_, max_cluster_size_);
     RCLCPP_INFO(this->get_logger(), "Cluster tolerance: %.3f m", cluster_tolerance_);
+    RCLCPP_INFO(this->get_logger(), "Object tracking: distance=%.2fcm, weight=%.1fg",
+                tracking_distance_threshold_ * 100.0, tracking_weight_threshold_);
   }
 
 private:
@@ -120,15 +158,19 @@ private:
 
     if (cluster_indices.empty()) {
       RCLCPP_DEBUG(this->get_logger(), "No objects detected");
+      // Increment miss counter for all tracked objects
+      update_tracked_objects_misses();
+      cleanup_stale_objects();
       return;
     }
 
     RCLCPP_INFO(this->get_logger(), "Detected %zu object(s)", cluster_indices.size());
 
-    // 4. Process each cluster
-    for (const auto& indices : cluster_indices) {
-      process_cluster(cloud_downsampled, indices, msg->header);
-    }
+    // 4. Process each cluster with tracking
+    process_clusters_with_tracking(cloud_downsampled, cluster_indices, msg->header);
+
+    // 5. Clean up stale tracked objects
+    cleanup_stale_objects();
   }
 
   void filter_workspace(
@@ -307,6 +349,212 @@ private:
     return std::min(1.0, std::max(0.5, confidence));
   }
 
+  // Object tracking functions
+  void process_clusters_with_tracking(
+    const pcl::PointCloud<pcl::PointXYZRGB>::Ptr& cloud,
+    const std::vector<pcl::PointIndices>& cluster_indices,
+    const std_msgs::msg::Header& header)
+  {
+    // Store detected objects this frame (position, weight, cluster data)
+    std::vector<DetectedObject> detected_objects;
+
+    // First pass: Extract all cluster information
+    for (const auto& indices : cluster_indices) {
+      // Extract cluster points
+      pcl::PointCloud<pcl::PointXYZRGB>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZRGB>);
+      for (const auto& idx : indices.indices) {
+        cluster->points.push_back(cloud->points[idx]);
+      }
+      cluster->width = cluster->points.size();
+      cluster->height = 1;
+      cluster->is_dense = true;
+
+      // Calculate centroid
+      Eigen::Vector4f centroid;
+      pcl::compute3DCentroid(*cluster, centroid);
+
+      // Calculate volume and weight
+      double volume = calculate_volume(cluster);
+      if (volume <= 0.0) {
+        continue;
+      }
+
+      double weight_kg = volume * material_density_;
+      double weight_grams = weight_kg * 1000.0;
+
+      // Calculate confidence
+      double confidence = calculate_confidence(cluster->points.size());
+      if (confidence < confidence_threshold_) {
+        continue;
+      }
+
+      // Store detected object
+      DetectedObject obj;
+      obj.position = Eigen::Vector3f(centroid[0], centroid[1], centroid[2]);
+      obj.weight = weight_grams;
+      obj.confidence = confidence;
+      obj.volume = volume * 1e6;  // m³ to cm³
+
+      // Create pose
+      obj.pose.position.x = centroid[0];
+      obj.pose.position.y = centroid[1];
+      obj.pose.position.z = centroid[2];
+      obj.pose.orientation.x = 0.0;
+      obj.pose.orientation.y = 0.0;
+      obj.pose.orientation.z = 0.0;
+      obj.pose.orientation.w = 1.0;
+
+      detected_objects.push_back(obj);
+    }
+
+    // Second pass: Match to tracked objects
+    std::set<uint32_t> matched_ids;
+    std::vector<bool> detection_matched(detected_objects.size(), false);
+
+    for (size_t i = 0; i < detected_objects.size(); ++i) {
+      const auto& detected = detected_objects[i];
+
+      // Find best matching tracked object
+      uint32_t best_match_id = find_matching_object(detected.position, detected.weight, matched_ids);
+
+      if (best_match_id != UINT32_MAX) {
+        // Matched to existing object - update it
+        auto& tracked = tracked_objects_[best_match_id];
+        tracked.position = detected.position;
+        tracked.weight = detected.weight;
+        tracked.last_seen = this->now();
+        tracked.consecutive_misses = 0;
+        matched_ids.insert(best_match_id);
+        detection_matched[i] = true;
+
+        // Publish with existing ID
+        publish_weight_estimate(best_match_id, detected, header);
+
+        RCLCPP_DEBUG(this->get_logger(), "Matched object %u (updated)", best_match_id);
+      }
+    }
+
+    // Third pass: Create new tracked objects for unmatched detections
+    for (size_t i = 0; i < detected_objects.size(); ++i) {
+      if (!detection_matched[i]) {
+        const auto& detected = detected_objects[i];
+
+        // Create new tracked object
+        uint32_t new_id = next_object_id_++;
+        TrackedObject new_tracked;
+        new_tracked.id = new_id;
+        new_tracked.position = detected.position;
+        new_tracked.weight = detected.weight;
+        new_tracked.last_seen = this->now();
+        new_tracked.consecutive_misses = 0;
+
+        tracked_objects_[new_id] = new_tracked;
+
+        // Publish with new ID
+        publish_weight_estimate(new_id, detected, header);
+
+        RCLCPP_INFO(this->get_logger(), "New object %u detected", new_id);
+      }
+    }
+
+    // Fourth pass: Increment miss counter for unmatched tracked objects
+    for (auto& [id, tracked] : tracked_objects_) {
+      if (matched_ids.find(id) == matched_ids.end()) {
+        tracked.consecutive_misses++;
+      }
+    }
+  }
+
+  uint32_t find_matching_object(const Eigen::Vector3f& position, float weight,
+                                  const std::set<uint32_t>& already_matched)
+  {
+    uint32_t best_match = UINT32_MAX;
+    double best_score = std::numeric_limits<double>::max();
+
+    for (const auto& [id, tracked] : tracked_objects_) {
+      // Skip already matched objects
+      if (already_matched.find(id) != already_matched.end()) {
+        continue;
+      }
+
+      // Calculate distance
+      float distance = (position - tracked.position).norm();
+
+      // Calculate weight difference
+      float weight_diff = std::abs(weight - tracked.weight);
+
+      // Check thresholds
+      if (distance > tracking_distance_threshold_) {
+        continue;
+      }
+      if (weight_diff > tracking_weight_threshold_) {
+        continue;
+      }
+
+      // Combined score (weighted sum of normalized distance and weight difference)
+      double score = distance / tracking_distance_threshold_ +
+                     weight_diff / tracking_weight_threshold_;
+
+      if (score < best_score) {
+        best_score = score;
+        best_match = id;
+      }
+    }
+
+    return best_match;
+  }
+
+  void publish_weight_estimate(uint32_t object_id,
+                                const DetectedObject& detected,
+                                const std_msgs::msg::Header& header)
+  {
+    auto weight_msg = sort_interfaces::msg::WeightEstimate();
+    weight_msg.header = header;
+    weight_msg.header.stamp = this->now();
+    weight_msg.object_id = object_id;
+    weight_msg.estimated_weight = detected.weight;
+    weight_msg.confidence = detected.confidence;
+    weight_msg.volume = detected.volume;
+    weight_msg.pose = detected.pose;
+
+    weight_pub_->publish(weight_msg);
+
+    RCLCPP_INFO(this->get_logger(),
+                "  Object %u: %.1fg @ (%.2f, %.2f, %.2f)",
+                object_id, detected.weight,
+                detected.position[0], detected.position[1], detected.position[2]);
+  }
+
+  void update_tracked_objects_misses()
+  {
+    for (auto& [id, tracked] : tracked_objects_) {
+      tracked.consecutive_misses++;
+    }
+  }
+
+  void cleanup_stale_objects()
+  {
+    auto now = this->now();
+    std::vector<uint32_t> to_remove;
+
+    for (const auto& [id, tracked] : tracked_objects_) {
+      // Check timeout
+      double time_since_seen = (now - tracked.last_seen).seconds();
+
+      if (time_since_seen > tracking_timeout_ ||
+          tracked.consecutive_misses > tracking_max_misses_) {
+        to_remove.push_back(id);
+        RCLCPP_INFO(this->get_logger(),
+                   "Removing stale object %u (%.1fs since last seen, %d misses)",
+                   id, time_since_seen, tracked.consecutive_misses);
+      }
+    }
+
+    for (uint32_t id : to_remove) {
+      tracked_objects_.erase(id);
+    }
+  }
+
   // ROS2 components
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_sub_;
   rclcpp::Publisher<sort_interfaces::msg::WeightEstimate>::SharedPtr weight_pub_;
@@ -322,8 +570,15 @@ private:
   double workspace_min_z_, workspace_max_z_;
   double confidence_threshold_;
 
+  // Tracking parameters
+  double tracking_distance_threshold_;
+  double tracking_weight_threshold_;
+  double tracking_timeout_;
+  int tracking_max_misses_;
+
   // State
   uint32_t next_object_id_;
+  std::map<uint32_t, TrackedObject> tracked_objects_;
 };
 
 int main(int argc, char** argv)
