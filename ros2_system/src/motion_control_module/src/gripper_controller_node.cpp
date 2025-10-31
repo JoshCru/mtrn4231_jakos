@@ -10,6 +10,7 @@
 #include <sensor_msgs/msg/joy.hpp>
 #include "sort_interfaces/msg/force_feedback.hpp"
 #include "sort_interfaces/srv/calibrate_gripper.hpp"
+#include "sort_interfaces/srv/gripper_control.hpp"
 #include <vector>
 #include <deque>
 #include <memory>
@@ -80,10 +81,15 @@ public:
         force_feedback_pub_ = this->create_publisher<sort_interfaces::msg::ForceFeedback>(
             "/motion_control/force_feedback", 10);
 
-        // Service
+        // Services
         calibration_service_ = this->create_service<sort_interfaces::srv::CalibrateGripper>(
             "/motion_control/calibrate_gripper",
             std::bind(&GripperControllerNode::handle_calibration, this,
+                     std::placeholders::_1, std::placeholders::_2));
+
+        gripper_control_service_ = this->create_service<sort_interfaces::srv::GripperControl>(
+            "/motion_control/gripper_control",
+            std::bind(&GripperControllerNode::handle_gripper_control, this,
                      std::placeholders::_1, std::placeholders::_2));
 
         // Timer for reading sensor and publishing
@@ -242,19 +248,25 @@ private:
         current_position_ = position;
 
         // Send command to Teensy via serial
-        // Protocol: "G<angle>\n" where angle = position * 180
-        int angle = static_cast<int>(position * 180.0f);
-        std::string command = "G" + std::to_string(angle) + "\n";
+        // Protocol: "w" for open (position ~0.0), "s" for close (position ~1.0)
+        std::string command;
+        if (position < 0.5f) {
+            command = "w";  // Open
+        } else {
+            command = "s";  // Close
+        }
 
         if (!simulation_mode_ && serial_ && serial_->isOpen()) {
             try {
                 serial_->write(command);
-                RCLCPP_DEBUG(this->get_logger(), "Sent to Teensy: %s", command.c_str());
+                RCLCPP_DEBUG(this->get_logger(), "Sent to Teensy: %s (position: %.2f)",
+                           command.c_str(), position);
             } catch (const std::exception& e) {
                 RCLCPP_WARN(this->get_logger(), "Failed to send command: %s", e.what());
             }
         } else {
-            RCLCPP_DEBUG(this->get_logger(), "Simulation: Gripper command %.2f (angle: %d)", position, angle);
+            RCLCPP_DEBUG(this->get_logger(), "Simulation: Gripper command %s (position: %.2f)",
+                       command.c_str(), position);
         }
     }
 
@@ -339,6 +351,53 @@ private:
         RCLCPP_INFO(this->get_logger(), "Calibration complete");
     }
 
+    void handle_gripper_control(
+        const std::shared_ptr<sort_interfaces::srv::GripperControl::Request> request,
+        std::shared_ptr<sort_interfaces::srv::GripperControl::Response> response)
+    {
+        if (!is_active_) {
+            response->success = false;
+            response->message = "Gripper controller not active";
+            response->final_position = current_position_;
+            RCLCPP_WARN(this->get_logger(), "Gripper control ignored: Node not active");
+            return;
+        }
+
+        std::string cmd = request->command;
+        float target_position = current_position_;
+
+        // Parse command
+        if (cmd == "open" || cmd == "w") {
+            target_position = 0.0f;  // Open
+            RCLCPP_INFO(this->get_logger(), "Opening gripper via service");
+        } else if (cmd == "close" || cmd == "s") {
+            target_position = 1.0f;  // Close
+            RCLCPP_INFO(this->get_logger(), "Closing gripper via service");
+        } else {
+            response->success = false;
+            response->message = "Invalid command. Use 'open', 'close', 'w', or 's'";
+            response->final_position = current_position_;
+            RCLCPP_WARN(this->get_logger(), "Invalid gripper command: %s", cmd.c_str());
+            return;
+        }
+
+        // Send command to gripper
+        send_gripper_command(target_position);
+
+        // Wait for movement to complete (estimate based on travel distance)
+        float travel_distance = std::abs(target_position - current_position_);
+        int wait_ms = static_cast<int>(travel_distance * 2000);  // ~2 seconds for full travel
+        if (wait_ms > 0) {
+            rclcpp::sleep_for(std::chrono::milliseconds(wait_ms));
+        }
+
+        response->success = true;
+        response->message = (target_position == 0.0f) ? "Gripper opened" : "Gripper closed";
+        response->final_position = current_position_;
+
+        RCLCPP_INFO(this->get_logger(), "Gripper control complete: %s", response->message.c_str());
+    }
+
     // Member variables
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr gripper_command_sub_;
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
@@ -347,6 +406,7 @@ private:
     rclcpp_lifecycle::LifecyclePublisher<sort_interfaces::msg::ForceFeedback>::SharedPtr force_feedback_pub_;
 
     rclcpp::Service<sort_interfaces::srv::CalibrateGripper>::SharedPtr calibration_service_;
+    rclcpp::Service<sort_interfaces::srv::GripperControl>::SharedPtr gripper_control_service_;
 
     rclcpp::TimerBase::SharedPtr timer_;
 

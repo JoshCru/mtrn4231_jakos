@@ -1,0 +1,7 @@
+# Service to control gripper open/close
+# command: "open" or "close" or "w" or "s"
+string command
+---
+bool success
+string message
+float32 final_position  # 0.0 = open, 1.0 = closed

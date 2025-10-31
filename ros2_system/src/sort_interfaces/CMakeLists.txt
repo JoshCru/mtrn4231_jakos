@@ -26,6 +26,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SystemCommand.srv"
   "srv/ValidateWorkspace.srv"
   "srv/CalibrateGripper.srv"
+  "srv/GripperControl.srv"
   # Actions
   "action/PickObject.action"
   "action/PlaceObject.action"

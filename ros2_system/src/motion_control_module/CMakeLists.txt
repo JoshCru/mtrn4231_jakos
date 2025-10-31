@@ -30,9 +30,17 @@ ament_target_dependencies(gripper_controller_node
   sort_interfaces
 )
 
+# gripper_button_interface executable
+add_executable(gripper_button_interface src/gripper_button_interface.cpp)
+ament_target_dependencies(gripper_button_interface
+  rclcpp
+  sort_interfaces
+)
+
 # Install targets
 install(TARGETS
   gripper_controller_node
+  gripper_button_interface
   DESTINATION lib/${PROJECT_NAME}
 )
 
