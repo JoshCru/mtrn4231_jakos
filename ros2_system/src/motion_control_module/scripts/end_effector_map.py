@@ -303,7 +303,7 @@ class MapGUI:
 
         # Origin
         self.canvas.create_oval(cx0-3, cy0-3, cx0+3, cy0+3, fill='#ffffff', outline='#ffffff')
-        self.canvas.create_text(cx0 + 15, cy0 + 15, text='(0,0)', fill='#888888', font=("Arial", 9"))
+        self.canvas.create_text(cx0 + 15, cy0 + 15, text='(0,0)', fill='#888888', font=("Arial", 9))
 
     def draw_square_box(self):
         """Draw the square workspace box"""
@@ -382,9 +382,9 @@ class MapGUI:
         # Draw current position (big point)
         cx, cy = self.world_to_canvas(px, py)
 
-        # Glow effect
-        self.canvas.create_oval(cx-15, cy-15, cx+15, cy+15, fill='#00ff0030', outline='')
-        self.canvas.create_oval(cx-10, cy-10, cx+10, cy+10, fill='#00ff0060', outline='')
+        # Glow effect (using solid colors for tkinter compatibility)
+        self.canvas.create_oval(cx-15, cy-15, cx+15, cy+15, fill='#003300', outline='')
+        self.canvas.create_oval(cx-10, cy-10, cx+10, cy+10, fill='#006600', outline='')
 
         # Main point
         self.canvas.create_oval(cx-6, cy-6, cx+6, cy+6, fill='#00ff00', outline='#00ff00', width=2)

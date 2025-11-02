@@ -44,10 +44,12 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# Install launch files and config
+# Install launch files, config, urdf, and scripts
 install(DIRECTORY
   launch
   config
+  urdf
+  scripts
   DESTINATION share/${PROJECT_NAME}
 )
 

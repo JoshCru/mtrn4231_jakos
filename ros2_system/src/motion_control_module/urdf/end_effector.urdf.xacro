@@ -1,0 +1,96 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!--
+    End-effector attachment for UR5e
+    This adds a visual representation of a gripper/tool to the robot
+  -->
+
+  <xacro:macro name="end_effector" params="prefix">
+
+    <!-- End-effector link -->
+    <link name="${prefix}end_effector_link">
+      <visual>
+        <origin xyz="0 0 0.075" rpy="0 0 0"/>
+        <geometry>
+          <!-- Placeholder: Simple box representing gripper/tool -->
+          <!-- Dimensions: 8cm wide x 6cm deep x 15cm long -->
+          <box size="0.08 0.06 0.15"/>
+        </geometry>
+        <material name="end_effector_material">
+          <color rgba="0.8 0.3 0.1 1.0"/>  <!-- Orange color -->
+        </material>
+      </visual>
+
+      <collision>
+        <origin xyz="0 0 0.075" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.08 0.06 0.15"/>
+        </geometry>
+      </collision>
+
+      <inertial>
+        <origin xyz="0 0 0.075" rpy="0 0 0"/>
+        <mass value="0.5"/>  <!-- Placeholder mass: 500g -->
+        <inertia ixx="0.001" ixy="0.0" ixz="0.0"
+                 iyy="0.001" iyz="0.0"
+                 izz="0.001"/>
+      </inertial>
+    </link>
+
+    <!-- Joint connecting tool0 to end-effector -->
+    <joint name="${prefix}end_effector_joint" type="fixed">
+      <parent link="${prefix}tool0"/>
+      <child link="${prefix}end_effector_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Optional: Add gripper fingers visualization -->
+    <link name="${prefix}gripper_left_finger">
+      <visual>
+        <origin xyz="0 0.02 0.14" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.02 0.01 0.08"/>
+        </geometry>
+        <material name="finger_material">
+          <color rgba="0.3 0.3 0.3 1.0"/>  <!-- Dark gray -->
+        </material>
+      </visual>
+    </link>
+
+    <joint name="${prefix}gripper_left_finger_joint" type="fixed">
+      <parent link="${prefix}end_effector_link"/>
+      <child link="${prefix}gripper_left_finger"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${prefix}gripper_right_finger">
+      <visual>
+        <origin xyz="0 -0.02 0.14" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.02 0.01 0.08"/>
+        </geometry>
+        <material name="finger_material">
+          <color rgba="0.3 0.3 0.3 1.0"/>  <!-- Dark gray -->
+        </material>
+      </visual>
+    </link>
+
+    <joint name="${prefix}gripper_right_finger_joint" type="fixed">
+      <parent link="${prefix}end_effector_link"/>
+      <child link="${prefix}gripper_right_finger"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Tip frame for easy reference -->
+    <link name="${prefix}end_effector_tip"/>
+
+    <joint name="${prefix}end_effector_tip_joint" type="fixed">
+      <parent link="${prefix}end_effector_link"/>
+      <child link="${prefix}end_effector_tip"/>
+      <origin xyz="0 0 0.18" rpy="0 0 0"/>  <!-- 18cm from tool0 -->
+    </joint>
+
+  </xacro:macro>
+
+</robot>
