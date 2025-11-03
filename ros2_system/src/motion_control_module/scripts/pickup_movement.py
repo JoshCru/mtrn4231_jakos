@@ -332,7 +332,7 @@ class PickupMovement(Node):
 
             # Send degree values directly (MoveIt will interpret as radians)
             # WARNING: This means 90 degrees sends 90.0 which MoveIt treats as 90 radians!
-            success = self.move_to_joint_positions(position['degrees'], duration_sec=5.0)
+            success = self.move_to_joint_positions(position['radians'], duration_sec=5.0)
 
             if not success:
                 self.get_logger().error(f"Failed to reach {position['name']}")
