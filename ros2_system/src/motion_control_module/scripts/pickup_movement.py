@@ -2,6 +2,7 @@
 """
 Pickup Movement Script for UR5e using MoveIt
 Moves through pick-up, lift, and put-down positions with user confirmation.
+Supports saving and loading custom sequences.
 """
 
 import rclpy
@@ -9,6 +10,9 @@ from rclpy.node import Node
 from geometry_msgs.msg import Pose, PoseStamped
 import sys
 import math
+import json
+import os
+from pathlib import Path
 
 try:
     from moveit_msgs.msg import RobotTrajectory, DisplayTrajectory, MoveItErrorCodes, Constraints, JointConstraint
@@ -46,12 +50,182 @@ class PickupMovement(Node):
         self.current_joint_state = None
         self.planning_group = "ur_manipulator"
 
+        # Path for saving/loading sequences
+        self.sequences_dir = Path.home() / "Documents/mtrn4231_jakos/saved_sequences"
+        self.sequences_dir.mkdir(parents=True, exist_ok=True)
+
         self.get_logger().info("Pickup Movement Node initialized with MoveIt")
         self.get_logger().info(f"Planning group: {self.planning_group}")
+        self.get_logger().info(f"Sequences directory: {self.sequences_dir}")
 
     def joint_state_callback(self, msg):
         """Store current joint states"""
         self.current_joint_state = msg
+
+    def get_current_joint_positions(self):
+        """Get current joint positions in order"""
+        if not self.current_joint_state:
+            return None
+
+        joint_names = [
+            'shoulder_pan_joint',
+            'shoulder_lift_joint',
+            'elbow_joint',
+            'wrist_1_joint',
+            'wrist_2_joint',
+            'wrist_3_joint'
+        ]
+
+        positions = []
+        for joint_name in joint_names:
+            try:
+                idx = self.current_joint_state.name.index(joint_name)
+                positions.append(self.current_joint_state.position[idx])
+            except ValueError:
+                self.get_logger().error(f"Joint {joint_name} not found in joint states")
+                return None
+
+        return positions
+
+    def record_waypoint(self, waypoint_name):
+        """Record current robot position as a waypoint"""
+        positions_rad = self.get_current_joint_positions()
+        if positions_rad is None:
+            return None
+
+        # Convert to degrees
+        positions_deg = [math.degrees(r) for r in positions_rad]
+
+        waypoint = {
+            'name': waypoint_name,
+            'degrees': positions_deg,
+            'radians': positions_rad
+        }
+
+        self.get_logger().info(f"Recorded waypoint '{waypoint_name}':")
+        self.get_logger().info(f"  Degrees: {[f'{d:.2f}' for d in positions_deg]}")
+        self.get_logger().info(f"  Radians: {[f'{r:.6f}' for r in positions_rad]}")
+
+        return waypoint
+
+    def save_sequence(self, sequence_name, waypoints):
+        """Save a sequence of waypoints to a JSON file"""
+        filepath = self.sequences_dir / f"{sequence_name}.json"
+
+        data = {
+            'name': sequence_name,
+            'waypoints': waypoints
+        }
+
+        with open(filepath, 'w') as f:
+            json.dump(data, f, indent=2)
+
+        self.get_logger().info(f"Saved sequence '{sequence_name}' to {filepath}")
+        return filepath
+
+    def load_sequence(self, sequence_name):
+        """Load a sequence from a JSON file"""
+        filepath = self.sequences_dir / f"{sequence_name}.json"
+
+        if not filepath.exists():
+            self.get_logger().error(f"Sequence file not found: {filepath}")
+            return None
+
+        with open(filepath, 'r') as f:
+            data = json.load(f)
+
+        self.get_logger().info(f"Loaded sequence '{sequence_name}' with {len(data['waypoints'])} waypoints")
+        return data['waypoints']
+
+    def list_saved_sequences(self):
+        """List all saved sequence files"""
+        sequences = []
+        for filepath in self.sequences_dir.glob("*.json"):
+            sequences.append(filepath.stem)
+        return sorted(sequences)
+
+    def get_default_sequence(self):
+        """Get the default pickup sequence"""
+        return [
+            {
+                'name': 'Home point',
+                'degrees': [0, -75, 90, -105, -90, 0],
+                'radians': [0.0, -1.308997, 1.570796, -1.832596, -1.570796, 0.0]
+            },
+            {
+                'name': 'Pick up point',
+                'degrees': [0, -53, 88, -127, -86, 9],
+                'radians': [0.0, -0.925025, 1.536420, -2.216568, -1.501300, 0.157080]
+            },
+            {
+                'name': 'Lift up point',
+                'degrees': [-12, -60, 82, -113, -86, 9],
+                'radians': [-0.209440, -1.047198, 1.431170, -1.972222, -1.501300, 0.157080]
+            },
+            {
+                'name': 'Put down point',
+                'degrees': [-12, -53, 88, -126, -86, 9],
+                'radians': [-0.209440, -0.925025, 1.536420, -2.199115, -1.501300, 0.157080]
+            },
+            {
+                'name': 'Home point (return)',
+                'degrees': [0, -75, 90, -105, -90, 0],
+                'radians': [0.0, -1.308997, 1.570796, -1.832596, -1.570796, 0.0]
+            }
+        ]
+
+    def record_new_sequence(self):
+        """Interactive recording of a new sequence"""
+        print("\n" + "="*60)
+        print("TEACH PENDANT MODE - Record New Sequence")
+        print("="*60)
+        print("\nInstructions:")
+        print("1. Manually move the robot to desired positions")
+        print("2. Press ENTER at each position to record it")
+        print("3. Type 'done' when finished recording")
+        print("="*60 + "\n")
+
+        sequence_name = input("Enter name for this sequence: ").strip()
+        if not sequence_name:
+            print("Invalid sequence name. Aborting.")
+            return None
+
+        waypoints = []
+        waypoint_num = 1
+
+        while True:
+            print(f"\n--- Waypoint {waypoint_num} ---")
+            user_input = input(f"Move robot to position, then press ENTER to record (or type 'done' to finish): ").strip().lower()
+
+            if user_input == 'done':
+                if len(waypoints) == 0:
+                    print("No waypoints recorded. Aborting.")
+                    return None
+                break
+
+            waypoint_name = input(f"Enter name for waypoint {waypoint_num} (or press ENTER for default): ").strip()
+            if not waypoint_name:
+                waypoint_name = f"Waypoint {waypoint_num}"
+
+            waypoint = self.record_waypoint(waypoint_name)
+            if waypoint:
+                waypoints.append(waypoint)
+                print(f"✓ Recorded '{waypoint_name}'")
+                waypoint_num += 1
+            else:
+                print("Failed to record waypoint. Try again.")
+
+        # Save the sequence
+        print(f"\nRecorded {len(waypoints)} waypoints total.")
+        save_choice = input("Save this sequence? (y/n): ").strip().lower()
+
+        if save_choice == 'y':
+            self.save_sequence(sequence_name, waypoints)
+            print(f"✓ Sequence '{sequence_name}' saved!")
+            return waypoints
+        else:
+            print("Sequence not saved.")
+            return waypoints
 
     def move_to_joint_positions(self, joint_positions, duration_sec=5.0):
         """Plan and execute movement to joint positions using MoveIt"""
@@ -135,7 +309,7 @@ class PickupMovement(Node):
             self.get_logger().error(f"Movement failed: {error_name}")
             return False
 
-    def run_pickup_sequence(self):
+    def run_pickup_sequence(self, positions):
         """Execute pickup movement sequence with user confirmation"""
         self.get_logger().info("Starting pickup movement sequence...")
 
@@ -144,27 +318,6 @@ class PickupMovement(Node):
             self.get_logger().info("Current joint positions:")
             for name, pos in zip(self.current_joint_state.name, self.current_joint_state.position):
                 self.get_logger().info(f"  {name}: {pos:.6f}")
-
-        # Define positions with degrees converted to radians
-        # Format: [shoulder_pan, shoulder_lift, elbow, wrist_1, wrist_2, wrist_3]
-
-        positions = [
-            {
-                'name': 'Pick up point',
-                'degrees': [8.38, -64.06, 88.17, -115.78, -82.23, 9.62],
-                'radians': [0.146259, -1.118060, 1.539123, -2.020468, -1.435257, 0.167936]
-            },
-            {
-                'name': 'Lift up point',
-                'degrees': [-12.38, -63.96, 88.20, -112.54, -86.12, -30.48],
-                'radians': [-0.216068, -1.116315, 1.539647, -1.963936, -1.503154, -0.532048]
-            },
-            {
-                'name': 'Put down point',
-                'degrees': [-12.40, -57.52, 93.82, -124.61, -86.16, -30.43],
-                'radians': [-0.216417, -1.003961, 1.637587, -2.174991, -1.503852, -0.531176]
-            }
-        ]
 
         for i, position in enumerate(positions):
             self.get_logger().info(f"\n{'='*60}")
@@ -215,15 +368,103 @@ def main(args=None):
         rclpy.shutdown()
         return
 
-    node.get_logger().info("Joint states received, starting movement...")
+    node.get_logger().info("Joint states received!")
 
     try:
-        success = node.run_pickup_sequence()
+        # Main menu
+        print("\n" + "="*60)
+        print("PICKUP MOVEMENT - Main Menu")
+        print("="*60)
+        print("\n1. Run default sequence (5 waypoints)")
+        print("2. Record new sequence (teach pendant mode)")
+        print("3. Load saved sequence")
+        print("4. List saved sequences")
+        print("5. Exit")
+        print("="*60)
 
-        if success:
-            node.get_logger().info("✓ Mission accomplished!")
+        choice = input("\nEnter choice (1-5): ").strip()
+
+        positions = None
+
+        if choice == '1':
+            # Use default sequence
+            print("\nUsing default sequence...")
+            positions = node.get_default_sequence()
+
+        elif choice == '2':
+            # Record new sequence
+            positions = node.record_new_sequence()
+            if positions is None:
+                print("Recording cancelled.")
+                node.destroy_node()
+                rclpy.shutdown()
+                return
+
+        elif choice == '3':
+            # Load saved sequence
+            saved_sequences = node.list_saved_sequences()
+            if not saved_sequences:
+                print("\nNo saved sequences found.")
+                print(f"Sequences are saved in: {node.sequences_dir}")
+                node.destroy_node()
+                rclpy.shutdown()
+                return
+
+            print("\nSaved sequences:")
+            for i, seq_name in enumerate(saved_sequences, 1):
+                print(f"  {i}. {seq_name}")
+
+            seq_choice = input(f"\nEnter sequence number (1-{len(saved_sequences)}): ").strip()
+            try:
+                seq_idx = int(seq_choice) - 1
+                if 0 <= seq_idx < len(saved_sequences):
+                    positions = node.load_sequence(saved_sequences[seq_idx])
+                else:
+                    print("Invalid sequence number.")
+                    node.destroy_node()
+                    rclpy.shutdown()
+                    return
+            except ValueError:
+                print("Invalid input.")
+                node.destroy_node()
+                rclpy.shutdown()
+                return
+
+        elif choice == '4':
+            # List saved sequences
+            saved_sequences = node.list_saved_sequences()
+            print("\nSaved sequences:")
+            if not saved_sequences:
+                print("  (none)")
+                print(f"\nSequences directory: {node.sequences_dir}")
+            else:
+                for seq_name in saved_sequences:
+                    print(f"  - {seq_name}")
+            node.destroy_node()
+            rclpy.shutdown()
+            return
+
+        elif choice == '5':
+            # Exit
+            print("Exiting...")
+            node.destroy_node()
+            rclpy.shutdown()
+            return
+
         else:
-            node.get_logger().error("✗ Mission failed!")
+            print("Invalid choice.")
+            node.destroy_node()
+            rclpy.shutdown()
+            return
+
+        # Execute sequence if positions were selected
+        if positions:
+            success = node.run_pickup_sequence(positions)
+
+            if success:
+                node.get_logger().info("✓ Mission accomplished!")
+            else:
+                node.get_logger().error("✗ Mission failed!")
 
     except KeyboardInterrupt:
         node.get_logger().info("Interrupted by user")
