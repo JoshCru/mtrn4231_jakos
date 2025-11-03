@@ -44,11 +44,12 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# Install launch files, config, urdf, and scripts
+# Install launch files, config, urdf, meshes, and scripts
 install(DIRECTORY
   launch
   config
   urdf
+  meshes
   scripts
   DESTINATION share/${PROJECT_NAME}
 )
