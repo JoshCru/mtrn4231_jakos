@@ -89,11 +89,12 @@ class PickupMovement(Node):
 
     def record_waypoint(self, waypoint_name):
         """Record current robot position as a waypoint"""
+        # Joint states are always in radians from ROS
         positions_rad = self.get_current_joint_positions()
         if positions_rad is None:
             return None
 
-        # Convert to degrees
+        # Convert to degrees for storage and sending to MoveIt
         positions_deg = [math.degrees(r) for r in positions_rad]
 
         waypoint = {
@@ -330,7 +331,8 @@ class PickupMovement(Node):
             print(f"\nPress ENTER to move to {position['name']}...")
             input()
 
-            success = self.move_to_joint_positions(position['radians'], duration_sec=5.0)
+            # Send degrees instead of radians
+            success = self.move_to_joint_positions(position['degrees'], duration_sec=5.0)
 
             if not success:
                 self.get_logger().error(f"Failed to reach {position['name']}")
