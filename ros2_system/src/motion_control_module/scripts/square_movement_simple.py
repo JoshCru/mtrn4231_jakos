@@ -32,9 +32,9 @@ class SimpleSquareMovement(Node):
         self.square_size = 0.15  # 15cm square
         self.z_height = 0.3  # Maintain constant z-height (30cm above base)
 
-        # Starting position (center of square)
-        self.center_x = 0.3  # 30cm in front of robot
-        self.center_y = 0.0  # Centered
+        # Starting position (center of square) - X positive, Y negative quadrant
+        self.center_x = 0.3  # 30cm in front of robot (positive X)
+        self.center_y = -0.15  # Negative Y quadrant
 
         # Create action client for joint trajectory control
         self.trajectory_client = ActionClient(
@@ -212,7 +212,7 @@ def main(args=None):
 
     if node.current_joint_state is None:
         node.get_logger().error("Timeout waiting for joint states!")
-        node.get_logger().error("Make sure the fake UR5e is running (use setupFakeur5e.sh)")
+        node.get_logger().error("Make sure the UR5e is running (use setupRealur5e.sh or setupFakeur5e.sh)")
         node.destroy_node()
         rclpy.shutdown()
         return

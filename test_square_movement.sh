@@ -1,12 +1,12 @@
 #!/bin/bash
-# Test script for square movement with fake UR5e
+# Test script for square movement with real UR5e
 
 echo "======================================"
-echo "UR5e Square Movement Test"
+echo "Real UR5e Square Movement Test"
 echo "======================================"
 echo ""
 echo "This script will:"
-echo "1. Check if the fake UR5e is running"
+echo "1. Check if the real UR5e is running"
 echo "2. Run the square movement pattern"
 echo ""
 
@@ -14,14 +14,14 @@ echo ""
 if ! ros2 topic list | grep -q "/joint_states"; then
     echo "ERROR: /joint_states topic not found!"
     echo ""
-    echo "Please start the fake UR5e first using:"
+    echo "Please start the real UR5e first using:"
     echo "  cd ~/Documents/mtrn4231_jakos/4231_scripts"
-    echo "  ./setupFakeur5e.sh"
+    echo "  ./setupRealur5e.sh"
     echo ""
     exit 1
 fi
 
-echo "✓ Fake UR5e is running"
+echo "✓ Real UR5e is running"
 echo ""
 
 # Check if trajectory controller is available
