@@ -94,13 +94,13 @@ class PickupMovement(Node):
         if positions_rad is None:
             return None
 
-        # Convert to degrees for storage and sending to MoveIt
-        positions_deg = [math.degrees(r) for r in positions_rad]
+        # Convert to degrees for storage and sending to MoveIt (as floats)
+        positions_deg = [float(math.degrees(r)) for r in positions_rad]
 
         waypoint = {
             'name': waypoint_name,
             'degrees': positions_deg,
-            'radians': positions_rad
+            'radians': [float(r) for r in positions_rad]
         }
 
         self.get_logger().info(f"Recorded waypoint '{waypoint_name}':")
@@ -149,21 +149,23 @@ class PickupMovement(Node):
         """Get the default pickup sequence"""
         import math
 
-        # Define in degrees then convert to radians
+        # Define in degrees (will be sent as-is to MoveIt)
         sequences_degrees = [
-            ('Home point', [0, -75, 90, -105, -90, 0]),
-            ('Pick up point', [0, -53, 88, -127, -86, 9]),
-            ('Lift up point', [-12, -60, 82, -113, -86, 9]),
-            ('Put down point', [-12, -53, 88, -126, -86, 9]),
-            ('Home point (return)', [0, -75, 90, -105, -90, 0])
+            ('Home point', [0.0, -75.0, 90.0, -105.0, -90.0, 0.0]),
+            ('Pick up point', [0.0, -53.0, 88.0, -127.0, -86.0, 9.0]),
+            ('Lift up point', [-12.0, -60.0, 82.0, -113.0, -86.0, 9.0]),
+            ('Put down point', [-12.0, -53.0, 88.0, -126.0, -86.0, 9.0]),
+            ('Home point (return)', [0.0, -75.0, 90.0, -105.0, -90.0, 0.0])
         ]
 
         positions = []
         for name, degrees in sequences_degrees:
+            # Keep degrees as floats for MoveIt
+            degrees_float = [float(d) for d in degrees]
             radians = [math.radians(d) for d in degrees]
             positions.append({
                 'name': name,
-                'degrees': degrees,
+                'degrees': degrees_float,
                 'radians': radians
             })
 
@@ -228,6 +230,9 @@ class PickupMovement(Node):
             self.get_logger().error("MoveIt action server not available!")
             return False
 
+        # Ensure all positions are floats
+        joint_positions = [float(p) for p in joint_positions]
+
         # Create MoveGroup goal
         goal_msg = MoveGroup.Goal()
         goal_msg.request.group_name = self.planning_group
@@ -250,7 +255,7 @@ class PickupMovement(Node):
         for i, (name, position) in enumerate(zip(joint_names, joint_positions)):
             joint_constraint = JointConstraint()
             joint_constraint.joint_name = name
-            joint_constraint.position = position
+            joint_constraint.position = float(position)  # Ensure float
             joint_constraint.tolerance_above = 0.1
             joint_constraint.tolerance_below = 0.1
             joint_constraint.weight = 1.0
