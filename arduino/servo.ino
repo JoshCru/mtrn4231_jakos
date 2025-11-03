@@ -6,9 +6,9 @@ int pos = 0;
 int open = 75;
 // int closed = 0; // 10g
 // int closed = 1; // 20g
-// int closed = 8; // 100g
-// int closed = 15; // 200g
-int closed = 25; // 500g
+int closed = 12; // 100g
+// int closed = 20; // 200g
+// int closed = 30; // 500g
 int moveRes = 1;
 int currentState = 1; // 0 = closed, 1 = open (starting open)
 int waitTime = 50; // ms
@@ -22,14 +22,14 @@ void setup() {
   
   // Wait for user to press Enter or Space
   Serial.println("=== GRIPPER INITIALIZATION ===");
-  Serial.println("Press ENTER or SPACE to start...");
+  Serial.println("Press F to start...");
   Serial.println("==============================\n");
   
   bool started = false;
   while (!started) {
     if (Serial.available() > 0) {
       char input = Serial.read();
-      if (input == '\n' || input == '\r' || input == ' ') {
+      if (input == 'F' || input == 'f' || input == ' ') {
         started = true;
         Serial.println("Starting gripper system...");
         Serial.println("Moving to open position...\n");
@@ -53,6 +53,7 @@ void setup() {
   Serial.println("=== GRIPPER CONTROLS ===");
   Serial.println("Press 'w' to OPEN gripper");
   Serial.println("Press 's' to CLOSE gripper");
+  Serial.println("Press 'e' to SELECT weight (10/20/50/100/200/500g)");
   Serial.println("========================\n");
 }
 
@@ -69,6 +70,64 @@ void loop() {
       closeGripper();
       currentState = 0;
     }
+    else if (input == 'e' || input == 'E') {
+      selectWeight();
+    }
+  }
+}
+
+void selectWeight() {
+  Serial.println("\n=== SELECT WEIGHT ===");
+  Serial.println("Enter weight: 10, 20, 50, 100, 200, or 500 (grams)");
+  
+  // Wait for user to enter a number
+  while (Serial.available() == 0) {
+    // Wait for input
+  }
+  
+  // Read the integer from serial
+  int weight = Serial.parseInt();
+  
+  // Clear any remaining characters in the buffer
+  while (Serial.available() > 0) {
+    Serial.read();
+  }
+  
+  // Map weight to closed position
+  bool validWeight = true;
+  int newClosed;
+  
+  switch (weight) {
+    case 10:
+      newClosed = 0;
+      break;
+    case 20:
+      newClosed = 3;
+      break;
+    case 50:
+      newClosed = 8;
+      break;
+    case 100:
+      newClosed = 12;
+      break;
+    case 200:
+      newClosed = 20;
+      break;
+    case 500:
+      newClosed = 30;
+      break;
+    default:
+      validWeight = false;
+      break;
+  }
+  
+  if (validWeight) {
+    closed = newClosed;
+    Serial.printf("Weight set to %dg (closed position = %d)\n", weight, closed);
+    Serial.println("=====================\n");
+  } else {
+    Serial.println("ERROR: Invalid weight! Must be 10, 20, 50, 100, 200, or 500");
+    Serial.println("Weight setting unchanged.\n");
   }
 }
 
