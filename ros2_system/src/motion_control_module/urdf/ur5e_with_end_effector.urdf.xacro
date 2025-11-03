@@ -1,109 +1,21 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="ur5e_with_end_effector">
 
-  <!-- robot name parameter -->
+  <!-- UR5e robot arm -->
+  <!-- URDF won't build if following args aren't defined -->
   <xacro:arg name="name" default="ur"/>
-
-  <!-- possible 'ur_type' values: ur3, ur3e, ur5, ur5e, ur10, ur10e, ur16e -->
   <xacro:arg name="ur_type" default="ur5e"/>
 
-  <!-- parameters -->
-  <xacro:arg name="tf_prefix" default="" />
-  <xacro:arg name="joint_limit_params" default="$(find ur_description)/config/ur5e/joint_limits.yaml"/>
-  <xacro:arg name="kinematics_params" default="$(find ur_description)/config/ur5e/default_kinematics.yaml"/>
-  <xacro:arg name="physical_params" default="$(find ur_description)/config/ur5e/physical_parameters.yaml"/>
-  <xacro:arg name="visual_params" default="$(find ur_description)/config/ur5e/visual_parameters.yaml"/>
-  <xacro:arg name="transmission_hw_interface" default=""/>
-  <xacro:arg name="safety_limits" default="false"/>
-  <xacro:arg name="safety_pos_margin" default="0.15"/>
-  <xacro:arg name="safety_k_position" default="20"/>
+  <!-- Include UR description -->
+  <xacro:include filename="$(find ur_description)/urdf/ur.urdf.xacro"/>
 
-  <!-- ros2_control related parameters -->
-  <xacro:arg name="headless_mode" default="false" />
-  <xacro:arg name="robot_ip" default="0.0.0.0" />
-  <xacro:arg name="script_filename" default=""/>
-  <xacro:arg name="output_recipe_filename" default=""/>
-  <xacro:arg name="input_recipe_filename" default=""/>
-  <xacro:arg name="reverse_ip" default="0.0.0.0"/>
-  <xacro:arg name="script_command_port" default="50004"/>
+  <!-- Include end effector -->
+  <xacro:include filename="$(find motion_control_module)/urdf/gripper.urdf"/>
 
-  <!-- tool communication related parameters-->
-  <xacro:arg name="use_tool_communication" default="false" />
-  <xacro:arg name="tool_voltage" default="0" />
-  <xacro:arg name="tool_parity" default="0" />
-  <xacro:arg name="tool_baud_rate" default="115200" />
-  <xacro:arg name="tool_stop_bits" default="1" />
-  <xacro:arg name="tool_rx_idle_chars" default="1.5" />
-  <xacro:arg name="tool_tx_idle_chars" default="3.5" />
-  <xacro:arg name="tool_device_name" default="/tmp/ttyUR" />
-  <xacro:arg name="tool_tcp_port" default="54321" />
-
-  <!-- Simulation parameters -->
-  <xacro:arg name="use_fake_hardware" default="false" />
-  <xacro:arg name="fake_sensor_commands" default="false" />
-  <xacro:arg name="sim_gazebo" default="false" />
-  <xacro:arg name="sim_ignition" default="false" />
-  <xacro:arg name="simulation_controllers" default="" />
-
-  <!-- Network configuration -->
-  <xacro:arg name="reverse_port" default="50001"/>
-  <xacro:arg name="script_sender_port" default="50002"/>
-  <xacro:arg name="trajectory_port" default="50003"/>
-  <xacro:arg name="non_blocking_read" default="false"/>
-  <xacro:arg name="keep_alive_count" default="2"/>
-
-  <!-- Include the base UR macro -->
-  <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro"/>
-
-  <!-- Include our end-effector -->
-  <xacro:include filename="$(find motion_control_module)/urdf/end_effector.urdf.xacro"/>
-
-  <!-- Create world link -->
-  <link name="world"/>
-
-  <!-- Instantiate the UR5e -->
-  <xacro:ur_robot
-    name="$(arg name)"
-    tf_prefix="$(arg tf_prefix)"
-    parent="world"
-    joint_limits_parameters_file="$(arg joint_limit_params)"
-    kinematics_parameters_file="$(arg kinematics_params)"
-    physical_parameters_file="$(arg physical_params)"
-    visual_parameters_file="$(arg visual_params)"
-    transmission_hw_interface="$(arg transmission_hw_interface)"
-    safety_limits="$(arg safety_limits)"
-    safety_pos_margin="$(arg safety_pos_margin)"
-    safety_k_position="$(arg safety_k_position)"
-    use_fake_hardware="$(arg use_fake_hardware)"
-    fake_sensor_commands="$(arg fake_sensor_commands)"
-    sim_gazebo="$(arg sim_gazebo)"
-    sim_ignition="$(arg sim_ignition)"
-    headless_mode="$(arg headless_mode)"
-    use_tool_communication="$(arg use_tool_communication)"
-    tool_voltage="$(arg tool_voltage)"
-    tool_parity="$(arg tool_parity)"
-    tool_baud_rate="$(arg tool_baud_rate)"
-    tool_stop_bits="$(arg tool_stop_bits)"
-    tool_rx_idle_chars="$(arg tool_rx_idle_chars)"
-    tool_tx_idle_chars="$(arg tool_tx_idle_chars)"
-    tool_device_name="$(arg tool_device_name)"
-    tool_tcp_port="$(arg tool_tcp_port)"
-    robot_ip="$(arg robot_ip)"
-    script_filename="$(arg script_filename)"
-    output_recipe_filename="$(arg output_recipe_filename)"
-    input_recipe_filename="$(arg input_recipe_filename)"
-    reverse_ip="$(arg reverse_ip)"
-    script_command_port="$(arg script_command_port)"
-    reverse_port="$(arg reverse_port)"
-    script_sender_port="$(arg script_sender_port)"
-    trajectory_port="$(arg trajectory_port)"
-    non_blocking_read="$(arg non_blocking_read)"
-    keep_alive_count="$(arg keep_alive_count)"
-    >
-    <origin xyz="0 0 0" rpy="0 0 0" />
-  </xacro:ur_robot>
-
-  <!-- Attach the end-effector -->
-  <xacro:end_effector prefix="$(arg tf_prefix)"/>
+  <!-- Coupler between arm and end effector -->
+  <joint name="ur5e_gripper_coupler_joint" type="fixed">
+    <parent link="tool0"/>
+    <child link="gripper_base"/>
+  </joint>
 
 </robot>

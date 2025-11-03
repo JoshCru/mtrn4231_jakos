@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
-Simple Square Box Movement Script for UR5e using MoveGroup Python interface
+Simple Square Box Movement Script for UR5e using MoveIt
 Moves the end effector in a square pattern while maintaining constant z-axis.
 """
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import Pose, PoseStamped
 import sys
 import math
 
 try:
-    from moveit_msgs.msg import RobotTrajectory, DisplayTrajectory
+    from moveit_msgs.msg import RobotTrajectory, DisplayTrajectory, MoveItErrorCodes, Constraints, JointConstraint
     from moveit_msgs.srv import GetCartesianPath
+    from moveit_msgs.action import MoveGroup
     from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
     from sensor_msgs.msg import JointState
     from std_msgs.msg import Header
-    from control_msgs.action import FollowJointTrajectory
     from rclpy.action import ActionClient
     IMPORTS_OK = True
 except ImportError as e:
@@ -36,11 +36,11 @@ class SimpleSquareMovement(Node):
         self.center_x = 0.3  # 30cm in front of robot (positive X)
         self.center_y = -0.15  # Negative Y quadrant
 
-        # Create action client for joint trajectory control
-        self.trajectory_client = ActionClient(
+        # Create MoveIt action client
+        self.move_group_client = ActionClient(
             self,
-            FollowJointTrajectory,
-            '/joint_trajectory_controller/follow_joint_trajectory'
+            MoveGroup,
+            '/move_action'
         )
 
         # Subscribe to joint states
@@ -52,15 +52,11 @@ class SimpleSquareMovement(Node):
         )
 
         self.current_joint_state = None
+        self.planning_group = "ur_manipulator"
 
-        # Create service client for cartesian path planning
-        self.cartesian_path_client = self.create_client(
-            GetCartesianPath,
-            '/compute_cartesian_path'
-        )
-
-        self.get_logger().info("Simple Square Movement Node initialized")
+        self.get_logger().info("Simple Square Movement Node initialized with MoveIt")
         self.get_logger().info(f"Square size: {self.square_size}m, Z-height: {self.z_height}m")
+        self.get_logger().info(f"Planning group: {self.planning_group}")
 
     def joint_state_callback(self, msg):
         """Store current joint states"""
@@ -98,15 +94,21 @@ class SimpleSquareMovement(Node):
         return waypoints
 
     def move_to_joint_positions(self, joint_positions, duration_sec=5.0):
-        """Send joint trajectory goal"""
-        if not self.trajectory_client.wait_for_server(timeout_sec=2.0):
-            self.get_logger().error("Action server not available!")
+        """Plan and execute movement to joint positions using MoveIt"""
+        if not self.move_group_client.wait_for_server(timeout_sec=5.0):
+            self.get_logger().error("MoveIt action server not available!")
             return False
 
-        # Create trajectory message
-        goal_msg = FollowJointTrajectory.Goal()
-        goal_msg.trajectory = JointTrajectory()
-        goal_msg.trajectory.joint_names = [
+        # Create MoveGroup goal
+        goal_msg = MoveGroup.Goal()
+        goal_msg.request.group_name = self.planning_group
+        goal_msg.request.num_planning_attempts = 10
+        goal_msg.request.allowed_planning_time = 10.0
+        goal_msg.request.max_velocity_scaling_factor = 0.2
+        goal_msg.request.max_acceleration_scaling_factor = 0.2
+
+        # Set joint constraints (target positions)
+        joint_names = [
             'shoulder_pan_joint',
             'shoulder_lift_joint',
             'elbow_joint',
@@ -115,59 +117,97 @@ class SimpleSquareMovement(Node):
             'wrist_3_joint'
         ]
 
-        # Create trajectory point
-        point = JointTrajectoryPoint()
-        point.positions = joint_positions
-        point.time_from_start.sec = int(duration_sec)
-        point.time_from_start.nanosec = int((duration_sec % 1) * 1e9)
+        constraints = Constraints()
+        for i, (name, position) in enumerate(zip(joint_names, joint_positions)):
+            joint_constraint = JointConstraint()
+            joint_constraint.joint_name = name
+            joint_constraint.position = position
+            joint_constraint.tolerance_above = 0.1
+            joint_constraint.tolerance_below = 0.1
+            joint_constraint.weight = 1.0
+            constraints.joint_constraints.append(joint_constraint)
 
-        goal_msg.trajectory.points = [point]
+        goal_msg.request.goal_constraints.append(constraints)
+        goal_msg.planning_options.plan_only = False  # Plan and execute
 
         # Send goal
-        self.get_logger().info(f"Sending trajectory with positions: {[f'{p:.3f}' for p in joint_positions]}")
-        send_goal_future = self.trajectory_client.send_goal_async(goal_msg)
+        self.get_logger().info(f"Planning and executing with MoveIt: {[f'{p:.3f}' for p in joint_positions]}")
+        send_goal_future = self.move_group_client.send_goal_async(goal_msg)
         rclpy.spin_until_future_complete(self, send_goal_future)
 
         goal_handle = send_goal_future.result()
         if not goal_handle.accepted:
-            self.get_logger().error("Goal rejected!")
+            self.get_logger().error("MoveIt goal rejected!")
             return False
 
-        self.get_logger().info("Goal accepted, waiting for result...")
+        self.get_logger().info("MoveIt goal accepted, executing...")
         result_future = goal_handle.get_result_async()
-        rclpy.spin_until_future_complete(self, result_future, timeout_sec=duration_sec + 2.0)
+        rclpy.spin_until_future_complete(self, result_future, timeout_sec=30.0)
 
-        return True
+        if result_future.result() is None:
+            self.get_logger().error("No result received from MoveIt (timeout?)")
+            return False
+
+        result = result_future.result().result
+        self.get_logger().info(f"MoveIt result error code: {result.error_code.val}")
+
+        # Map common error codes
+        error_names = {
+            1: "SUCCESS",
+            99999: "FAILURE",
+            -1: "PLANNING_FAILED",
+            -2: "INVALID_MOTION_PLAN",
+            -3: "MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE",
+            -4: "CONTROL_FAILED",
+            -5: "UNABLE_TO_AQUIRE_SENSOR_DATA",
+            -7: "TIMED_OUT",
+            -10: "PREEMPTED",
+            -11: "START_STATE_IN_COLLISION",
+            -12: "START_STATE_VIOLATES_PATH_CONSTRAINTS",
+            -21: "INVALID_GROUP_NAME",
+        }
+        error_name = error_names.get(result.error_code.val, f"UNKNOWN({result.error_code.val})")
+
+        if result.error_code.val == MoveItErrorCodes.SUCCESS:
+            self.get_logger().info("Movement successful!")
+            return True
+        else:
+            self.get_logger().error(f"Movement failed: {error_name}")
+            return False
 
     def run_simple_square(self):
         """Execute a simple square movement using predefined joint positions"""
         self.get_logger().info("Starting simple square movement...")
 
+        # Print current joint state for debugging
+        if self.current_joint_state:
+            self.get_logger().info("Current joint positions:")
+            for name, pos in zip(self.current_joint_state.name, self.current_joint_state.position):
+                self.get_logger().info(f"  {name}: {pos:.6f}")
+
         # Safe joint configurations that form a square pattern (approximately)
         # These are hand-tuned to avoid singularities
         # Format: [shoulder_pan, shoulder_lift, elbow, wrist_1, wrist_2, wrist_3]
+        # Skip the first "home" position since we're already there
 
         positions = [
-            # Home/Start position
-            [0.0, -1.57, -1.57, -1.57, 1.57, 0.0],
+            # Corner 1 (move in X+ Y- quadrant)
+            [0.15, -1.25, 1.60, -1.90, -1.57, 0.0],
 
-            # Corner 1 (forward-right)
-            [0.3, -1.4, -1.7, -1.5, 1.57, 0.0],
+            # Corner 2
+            [-0.15, -1.25, 1.60, -1.90, -1.57, 0.0],
 
-            # Corner 2 (forward-left)
-            [-0.3, -1.4, -1.7, -1.5, 1.57, 0.0],
+            # Corner 3
+            [-0.15, -1.45, 1.50, -1.60, -1.57, 0.0],
 
-            # Corner 3 (back-left)
-            [-0.3, -1.7, -1.4, -1.5, 1.57, 0.0],
-
-            # Corner 4 (back-right)
-            [0.3, -1.7, -1.4, -1.5, 1.57, 0.0],
+            # Corner 4
+            [0.15, -1.45, 1.50, -1.60, -1.57, 0.0],
 
             # Return to Corner 1
-            [0.3, -1.4, -1.7, -1.5, 1.57, 0.0],
+            [0.15, -1.25, 1.60, -1.90, -1.57, 0.0],
 
-            # Return home
-            [0.0, -1.57, -1.57, -1.57, 1.57, 0.0],
+            # Return home (safe position)
+            [0.0, -1.57, 1.57, -1.57, -1.57, 0.0],
         ]
 
         self.get_logger().info(f"Moving through {len(positions)} positions...")
@@ -212,7 +252,7 @@ def main(args=None):
 
     if node.current_joint_state is None:
         node.get_logger().error("Timeout waiting for joint states!")
-        node.get_logger().error("Make sure the UR5e is running (use setupRealur5e.sh or setupFakeur5e.sh)")
+        node.get_logger().error("Make sure the UR5e and MoveIt are running (use setupRealur5e.sh or setupFakeur5e.sh)")
         node.destroy_node()
         rclpy.shutdown()
         return

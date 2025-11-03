@@ -1,12 +1,47 @@
 #!/bin/bash
-# Test script for square movement with real UR5e
+# Test script for square movement - supports both fake and real UR5e
 
 echo "======================================"
-echo "Real UR5e Square Movement Test"
+echo "UR5e Square Movement Test"
 echo "======================================"
 echo ""
+
+# Check if argument provided
+if [ -z "$1" ]; then
+    echo "Choose hardware mode:"
+    echo "1) Real hardware"
+    echo "2) Fake hardware"
+    read -p "Enter choice (1 or 2): " choice
+
+    if [ "$choice" == "1" ]; then
+        MODE="REAL"
+        SETUP_SCRIPT="setupRealur5e.sh"
+    elif [ "$choice" == "2" ]; then
+        MODE="FAKE"
+        SETUP_SCRIPT="setupFakeur5e.sh"
+    else
+        echo "Invalid choice. Exiting."
+        exit 1
+    fi
+else
+    # Argument provided
+    if [ "$1" == "real" ]; then
+        MODE="REAL"
+        SETUP_SCRIPT="setupRealur5e.sh"
+    elif [ "$1" == "fake" ]; then
+        MODE="FAKE"
+        SETUP_SCRIPT="setupFakeur5e.sh"
+    else
+        echo "Usage: $0 [real|fake]"
+        exit 1
+    fi
+fi
+
+echo ""
+echo "Testing with $MODE UR5e"
+echo ""
 echo "This script will:"
-echo "1. Check if the real UR5e is running"
+echo "1. Check if the $MODE UR5e is running"
 echo "2. Run the square movement pattern"
 echo ""
 
@@ -14,14 +49,14 @@ echo ""
 if ! ros2 topic list | grep -q "/joint_states"; then
     echo "ERROR: /joint_states topic not found!"
     echo ""
-    echo "Please start the real UR5e first using:"
+    echo "Please start the $MODE UR5e first using:"
     echo "  cd ~/Documents/mtrn4231_jakos/4231_scripts"
-    echo "  ./setupRealur5e.sh"
+    echo "  ./$SETUP_SCRIPT"
     echo ""
     exit 1
 fi
 
-echo "✓ Real UR5e is running"
+echo "✓ $MODE UR5e is running"
 echo ""
 
 # Check if trajectory controller is available
