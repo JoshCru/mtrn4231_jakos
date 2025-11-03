@@ -47,7 +47,7 @@
     <!-- Left arm - Upper limb (first segment) -->
     <link name="${prefix}gripper_left_upper">
       <visual>
-        <origin xyz="0 0.015 0.03" rpy="0 0 0"/>
+        <origin xyz="0 0 0.03" rpy="0 0 0"/>  <!-- Center of 6cm box -->
         <geometry>
           <box size="0.015 0.022 0.06"/>  <!-- Upper segment -->
         </geometry>
@@ -57,14 +57,14 @@
       </visual>
 
       <collision>
-        <origin xyz="0 0.015 0.03" rpy="0 0 0"/>
+        <origin xyz="0 0 0.03" rpy="0 0 0"/>
         <geometry>
           <box size="0.015 0.022 0.06"/>
         </geometry>
       </collision>
 
       <inertial>
-        <origin xyz="0 0.015 0.03" rpy="0 0 0"/>
+        <origin xyz="0 0 0.03" rpy="0 0 0"/>
         <mass value="0.05"/>
         <inertia ixx="0.00005" ixy="0.0" ixz="0.0"
                  iyy="0.00005" iyz="0.0"
@@ -75,13 +75,13 @@
     <joint name="${prefix}gripper_left_upper_joint" type="fixed">
       <parent link="${prefix}end_effector_link"/>
       <child link="${prefix}gripper_left_upper"/>
-      <origin xyz="0 0 0.04" rpy="0 0 0"/>
+      <origin xyz="0 0.015 0.04" rpy="0 0 0"/>  <!-- Offset to left side -->
     </joint>
 
     <!-- Left arm - Lower limb (second segment) -->
     <link name="${prefix}gripper_left_lower">
       <visual>
-        <origin xyz="0 0.015 0.03" rpy="0 0 0"/>
+        <origin xyz="0 0 0.03" rpy="0 0 0"/>  <!-- Center of 6cm box -->
         <geometry>
           <box size="0.012 0.018 0.06"/>  <!-- Lower segment, slightly thinner -->
         </geometry>
@@ -91,14 +91,14 @@
       </visual>
 
       <collision>
-        <origin xyz="0 0.015 0.03" rpy="0 0 0"/>
+        <origin xyz="0 0 0.03" rpy="0 0 0"/>
         <geometry>
           <box size="0.012 0.018 0.06"/>
         </geometry>
       </collision>
 
       <inertial>
-        <origin xyz="0 0.015 0.03" rpy="0 0 0"/>
+        <origin xyz="0 0 0.03" rpy="0 0 0"/>
         <mass value="0.04"/>
         <inertia ixx="0.00004" ixy="0.0" ixz="0.0"
                  iyy="0.00004" iyz="0.0"
@@ -109,13 +109,13 @@
     <joint name="${prefix}gripper_left_lower_joint" type="fixed">
       <parent link="${prefix}gripper_left_upper"/>
       <child link="${prefix}gripper_left_lower"/>
-      <origin xyz="0 0 0.06" rpy="0 0 0"/>  <!-- Offset from upper limb -->
+      <origin xyz="0 0 0.06" rpy="0 0 0"/>  <!-- At end of upper limb -->
     </joint>
 
     <!-- Left arm tip (tapered end) -->
     <link name="${prefix}gripper_left_tip">
       <visual>
-        <origin xyz="0 0.015 0.07" rpy="0 0 0"/>
+        <origin xyz="0 0 0.01" rpy="0 0 0"/>  <!-- Center of 2cm box -->
         <geometry>
           <box size="0.01 0.015 0.02"/>  <!-- Smaller tip -->
         </geometry>
@@ -125,7 +125,7 @@
       </visual>
 
       <collision>
-        <origin xyz="0 0.015 0.07" rpy="0 0 0"/>
+        <origin xyz="0 0 0.01" rpy="0 0 0"/>
         <geometry>
           <box size="0.01 0.015 0.02"/>
         </geometry>
@@ -141,7 +141,7 @@
     <!-- Right arm - Upper limb (first segment) -->
     <link name="${prefix}gripper_right_upper">
       <visual>
-        <origin xyz="0 -0.015 0.03" rpy="0 0 0"/>
+        <origin xyz="0 0 0.03" rpy="0 0 0"/>  <!-- Center of this 6cm segment -->
         <geometry>
           <box size="0.015 0.022 0.06"/>  <!-- Upper segment -->
         </geometry>
@@ -151,14 +151,14 @@
       </visual>
 
       <collision>
-        <origin xyz="0 -0.015 0.03" rpy="0 0 0"/>
+        <origin xyz="0 0 0.03" rpy="0 0 0"/>
         <geometry>
           <box size="0.015 0.022 0.06"/>
         </geometry>
       </collision>
 
       <inertial>
-        <origin xyz="0 -0.015 0.03" rpy="0 0 0"/>
+        <origin xyz="0 0 0.03" rpy="0 0 0"/>
         <mass value="0.05"/>
         <inertia ixx="0.00005" ixy="0.0" ixz="0.0"
                  iyy="0.00005" iyz="0.0"
@@ -169,13 +169,13 @@
     <joint name="${prefix}gripper_right_upper_joint" type="fixed">
       <parent link="${prefix}end_effector_link"/>
       <child link="${prefix}gripper_right_upper"/>
-      <origin xyz="0 0 0.04" rpy="0 0 0"/>
+      <origin xyz="0 -0.015 0.04" rpy="0 0 0"/>  <!-- Offset to the right -->
     </joint>
 
     <!-- Right arm - Lower limb (second segment) -->
     <link name="${prefix}gripper_right_lower">
       <visual>
-        <origin xyz="0 -0.015 0.03" rpy="0 0 0"/>
+        <origin xyz="0 0 0.03" rpy="0 0 0"/>  <!-- Center of this 6cm segment -->
         <geometry>
           <box size="0.012 0.018 0.06"/>  <!-- Lower segment, slightly thinner -->
         </geometry>
@@ -185,14 +185,14 @@
       </visual>
 
       <collision>
-        <origin xyz="0 -0.015 0.03" rpy="0 0 0"/>
+        <origin xyz="0 0 0.03" rpy="0 0 0"/>
         <geometry>
           <box size="0.012 0.018 0.06"/>
         </geometry>
       </collision>
 
       <inertial>
-        <origin xyz="0 -0.015 0.03" rpy="0 0 0"/>
+        <origin xyz="0 0 0.03" rpy="0 0 0"/>
         <mass value="0.04"/>
         <inertia ixx="0.00004" ixy="0.0" ixz="0.0"
                  iyy="0.00004" iyz="0.0"
@@ -203,13 +203,13 @@
     <joint name="${prefix}gripper_right_lower_joint" type="fixed">
       <parent link="${prefix}gripper_right_upper"/>
       <child link="${prefix}gripper_right_lower"/>
-      <origin xyz="0 0 0.06" rpy="0 0 0"/>  <!-- Offset from upper limb -->
+      <origin xyz="0 0 0.06" rpy="0 0 0"/>  <!-- At end of upper limb -->
     </joint>
 
     <!-- Right arm tip (tapered end) -->
     <link name="${prefix}gripper_right_tip">
       <visual>
-        <origin xyz="0 -0.015 0.07" rpy="0 0 0"/>
+        <origin xyz="0 0 0.01" rpy="0 0 0"/>  <!-- Center of 2cm tip -->
         <geometry>
           <box size="0.01 0.015 0.02"/>  <!-- Smaller tip -->
         </geometry>
@@ -219,7 +219,7 @@
       </visual>
 
       <collision>
-        <origin xyz="0 -0.015 0.07" rpy="0 0 0"/>
+        <origin xyz="0 0 0.01" rpy="0 0 0"/>
         <geometry>
           <box size="0.01 0.015 0.02"/>
         </geometry>
