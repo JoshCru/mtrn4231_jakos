@@ -1,0 +1,7 @@
+source ../ros2_system/install/setup.bash
+
+gnome-terminal -t "DriverServer" -- bash -c 'ros2 launch ur_robot_driver ur_control.launch.py ur_type:=ur5e robot_ip:=192.168.0.100 use_fake_hardware:=false launch_rviz:=false description_file:=ur5e_with_end_effector.urdf.xacro description_package:=motion_control_module; exec bash'
+
+sleep 10
+
+gnome-terminal -t "MoveitServer" -- bash -c 'ros2 launch ur_moveit_config ur_moveit.launch.py  ur_type:=ur5e launch_rviz:=true use_fake_hardware:=false description_file:=ur5e_with_end_effector.urdf.xacro description_package:=motion_control_module; exec bash'
