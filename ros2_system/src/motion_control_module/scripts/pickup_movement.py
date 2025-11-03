@@ -147,33 +147,27 @@ class PickupMovement(Node):
 
     def get_default_sequence(self):
         """Get the default pickup sequence"""
-        return [
-            {
-                'name': 'Home point',
-                'degrees': [0, -75, 90, -105, -90, 0],
-                'radians': [0.0, -1.308997, 1.570796, -1.832596, -1.570796, 0.0]
-            },
-            {
-                'name': 'Pick up point',
-                'degrees': [0, -53, 88, -127, -86, 9],
-                'radians': [0.0, -0.925025, 1.536420, -2.216568, -1.501300, 0.157080]
-            },
-            {
-                'name': 'Lift up point',
-                'degrees': [-12, -60, 82, -113, -86, 9],
-                'radians': [-0.209440, -1.047198, 1.431170, -1.972222, -1.501300, 0.157080]
-            },
-            {
-                'name': 'Put down point',
-                'degrees': [-12, -53, 88, -126, -86, 9],
-                'radians': [-0.209440, -0.925025, 1.536420, -2.199115, -1.501300, 0.157080]
-            },
-            {
-                'name': 'Home point (return)',
-                'degrees': [0, -75, 90, -105, -90, 0],
-                'radians': [0.0, -1.308997, 1.570796, -1.832596, -1.570796, 0.0]
-            }
+        import math
+
+        # Define in degrees then convert to radians
+        sequences_degrees = [
+            ('Home point', [0, -75, 90, -105, -90, 0]),
+            ('Pick up point', [0, -53, 88, -127, -86, 9]),
+            ('Lift up point', [-12, -60, 82, -113, -86, 9]),
+            ('Put down point', [-12, -53, 88, -126, -86, 9]),
+            ('Home point (return)', [0, -75, 90, -105, -90, 0])
         ]
+
+        positions = []
+        for name, degrees in sequences_degrees:
+            radians = [math.radians(d) for d in degrees]
+            positions.append({
+                'name': name,
+                'degrees': degrees,
+                'radians': radians
+            })
+
+        return positions
 
     def record_new_sequence(self):
         """Interactive recording of a new sequence"""
@@ -331,7 +325,8 @@ class PickupMovement(Node):
             print(f"\nPress ENTER to move to {position['name']}...")
             input()
 
-            # Send degrees instead of radians
+            # Send degree values directly (MoveIt will interpret as radians)
+            # WARNING: This means 90 degrees sends 90.0 which MoveIt treats as 90 radians!
             success = self.move_to_joint_positions(position['degrees'], duration_sec=5.0)
 
             if not success:
