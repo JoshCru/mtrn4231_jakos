@@ -47,7 +47,13 @@ class WeightDetector(Node):
         self.torque_history = [deque(maxlen=self.history_length) for _ in range(self.num_joints)]
         self.filtered_torque_history = [deque(maxlen=self.history_length) for _ in range(self.num_joints)]
         
-        self.kalman_filters = [KalmanFilter(process_variance=0.001, measurement_variance=0.01) 
+        # ! Faster values, better for real-time
+        # self.kalman_filters = [KalmanFilter(process_variance=0.
+        # #0015, measurement_variance=0.03) 
+                            #    for _ in range(self.num_joints)]
+
+        # ! Smoother values, take longer to adjust to change
+        self.kalman_filters = [KalmanFilter(process_variance=0.0015, measurement_variance=0.04) 
                                for _ in range(self.num_joints)]
         
         plt.ion()
