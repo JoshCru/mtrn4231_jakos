@@ -255,14 +255,14 @@ class PickupMovement(Node):
         """Plan and execute movement to joint positions using MoveIt
 
         Args:
-            joint_positions: List of 6 joint positions in order [Joint6, Joint1, Joint2, Joint3, Joint4, Joint5]
+            joint_positions: List of 6 joint positions in RADIANS in order [Joint6, Joint1, Joint2, Joint3, Joint4, Joint5]
             duration_sec: Duration for movement (not used with MoveIt)
         """
         if not self.move_group_client.wait_for_server(timeout_sec=5.0):
             self.get_logger().error("MoveIt action server not available!")
             return False
 
-        # Ensure all positions are floats
+        # Ensure all positions are floats in radians
         joint_positions = [float(p) for p in joint_positions]
 
         # Create MoveGroup goal
@@ -273,7 +273,6 @@ class PickupMovement(Node):
         goal_msg.request.max_velocity_scaling_factor = 0.2
         goal_msg.request.max_acceleration_scaling_factor = 0.2
 
-        # Set joint constraints (target positions)
         # Joint order: [Joint6, Joint1, Joint2, Joint3, Joint4, Joint5]
         joint_names = [
             'shoulder_pan_joint',   # Joint 6 (base)
@@ -284,21 +283,35 @@ class PickupMovement(Node):
             'wrist_3_joint'         # Joint 5
         ]
 
+        # Create a robot state with the goal joint positions
+        from moveit_msgs.msg import RobotState as RobotStateMsg
+        goal_state = RobotStateMsg()
+        goal_state.joint_state.name = joint_names
+        goal_state.joint_state.position = joint_positions
+
+        # Set this as the goal using constraints with tight tolerances
         constraints = Constraints()
         for i, (name, position) in enumerate(zip(joint_names, joint_positions)):
             joint_constraint = JointConstraint()
             joint_constraint.joint_name = name
-            joint_constraint.position = float(position)  # Ensure float
-            joint_constraint.tolerance_above = 0.1
-            joint_constraint.tolerance_below = 0.1
+            joint_constraint.position = float(position)  # In radians
+            joint_constraint.tolerance_above = 0.01  # Tighter tolerance (0.01 rad ≈ 0.57°)
+            joint_constraint.tolerance_below = 0.01
             joint_constraint.weight = 1.0
             constraints.joint_constraints.append(joint_constraint)
 
         goal_msg.request.goal_constraints.append(constraints)
         goal_msg.planning_options.plan_only = False  # Plan and execute
 
+        # Log what we're sending
+        self.get_logger().info("="*60)
+        self.get_logger().info("Sending joint positions to MoveIt:")
+        for name, pos_rad in zip(joint_names, joint_positions):
+            pos_deg = math.degrees(pos_rad)
+            self.get_logger().info(f"  {name:25s} = {pos_rad:8.4f} rad ({pos_deg:7.2f}°)")
+        self.get_logger().info("="*60)
+
         # Send goal
-        self.get_logger().info(f"Planning and executing with MoveIt: {[f'{p:.3f}' for p in joint_positions]}")
         send_goal_future = self.move_group_client.send_goal_async(goal_msg)
         rclpy.spin_until_future_complete(self, send_goal_future)
 
@@ -355,16 +368,17 @@ class PickupMovement(Node):
         for i, position in enumerate(positions):
             self.get_logger().info(f"\n{'='*60}")
             self.get_logger().info(f"Position {i+1}/{len(positions)}: {position['name']}")
-            self.get_logger().info(f"Target angles (degrees): {position['degrees']}")
-            self.get_logger().info(f"Target angles (radians): {[f'{r:.6f}' for r in position['radians']]}")
+            self.get_logger().info(f"{'='*60}")
+            self.get_logger().info("Target joint angles [J6, J1, J2, J3, J4, J5]:")
+            self.get_logger().info(f"  Degrees: {[f'{d:7.2f}°' for d in position['degrees']]}")
+            self.get_logger().info(f"  Radians: {[f'{r:8.4f}' for r in position['radians']]}")
             self.get_logger().info(f"{'='*60}")
 
             # Wait for user confirmation
             print(f"\nPress ENTER to move to {position['name']}...")
             input()
 
-            # Send degree values directly (MoveIt will interpret as radians)
-            # WARNING: This means 90 degrees sends 90.0 which MoveIt treats as 90 radians!
+            # Send radian values to MoveIt
             success = self.move_to_joint_positions(position['radians'], duration_sec=5.0)
 
             if not success:
