@@ -180,30 +180,30 @@ private:
         // Send goal
         RCLCPP_INFO(this->get_logger(), "Sending goal to MoveIt...");
 
-        // Send goal without callbacks (we'll handle result synchronously)
+        // Send goal without callbacks (we'll wait synchronously)
         auto goal_handle_future = move_group_client_->async_send_goal(goal_msg);
 
-        // Wait for the goal to complete
-        if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), goal_handle_future) !=
-            rclcpp::FutureReturnCode::SUCCESS)
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to send goal");
+        // Wait for the goal to be accepted (with timeout)
+        auto status = goal_handle_future.wait_for(std::chrono::seconds(5));
+        if (status != std::future_status::ready) {
+            RCLCPP_ERROR(this->get_logger(), "Timeout waiting for goal to be accepted");
             return false;
         }
 
         auto goal_handle = goal_handle_future.get();
         if (!goal_handle) {
-            RCLCPP_ERROR(this->get_logger(), "Goal was rejected");
+            RCLCPP_ERROR(this->get_logger(), "Goal was rejected by MoveIt");
             return false;
         }
 
-        // Wait for result
+        RCLCPP_INFO(this->get_logger(), "Goal accepted by MoveIt, executing...");
+
+        // Wait for result (with timeout)
         auto result_future = move_group_client_->async_get_result(goal_handle);
 
-        if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), result_future, std::chrono::seconds(30)) !=
-            rclcpp::FutureReturnCode::SUCCESS)
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to get result");
+        status = result_future.wait_for(std::chrono::seconds(30));
+        if (status != std::future_status::ready) {
+            RCLCPP_ERROR(this->get_logger(), "Timeout waiting for movement to complete");
             return false;
         }
 
