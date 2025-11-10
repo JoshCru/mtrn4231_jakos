@@ -17,13 +17,14 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(sort_interfaces REQUIRED)
 
-# Install launch files, config, urdf, scripts, and srdf
+# Install launch files, config, urdf, scripts, srdf, and meshes
 install(DIRECTORY
   launch
   config
   urdf
   scripts
   srdf
+  meshes
   DESTINATION share/${PROJECT_NAME}
 )
 

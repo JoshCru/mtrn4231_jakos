@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<robot name="gripper">
+
+  <!-- Gripper base link with STL mesh -->
+  <link name="gripper_base">
+    <!-- Gripper mesh for visualization -->
+    <visual>
+      <origin xyz="0 0 0" rpy="3.14159 0 0"/>  <!-- Flipped 180 degrees around X axis -->
+      <geometry>
+        <mesh filename="package://motion_control_module/meshes/gripper.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="gripper_material">
+        <color rgba="0.7 0.7 0.7 1.0"/>  <!-- Light gray -->
+      </material>
+    </visual>
+
+    <!-- Simplified collision geometry for MoveIt (box approximation) -->
+    <collision>
+      <origin xyz="0 0 0.075" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.08 0.08 0.15"/>  <!-- Approximate gripper as a box -->
+      </geometry>
+    </collision>
+
+    <inertial>
+      <origin xyz="0 0 0.075" rpy="0 0 0"/>
+      <mass value="0.5"/>
+      <inertia ixx="0.001" ixy="0.0" ixz="0.0"
+               iyy="0.001" iyz="0.0"
+               izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- Gripper tip frame for easy reference -->
+  <link name="gripper_tip">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.01"/>
+      <inertia ixx="0.00001" ixy="0.0" ixz="0.0"
+               iyy="0.00001" iyz="0.0"
+               izz="0.00001"/>
+    </inertial>
+  </link>
+
+  <joint name="gripper_tip_joint" type="fixed">
+    <parent link="gripper_base"/>
+    <child link="gripper_tip"/>
+    <origin xyz="0 0 0.15" rpy="0 0 0"/>  <!-- Adjust Z value based on gripper length -->
+  </joint>
+
+</robot>
