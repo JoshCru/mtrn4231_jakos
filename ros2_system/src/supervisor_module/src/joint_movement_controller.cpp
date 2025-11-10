@@ -255,20 +255,29 @@ private:
         RCLCPP_INFO(this->get_logger(), "Calling async_send_goal...");
         auto goal_handle_future = move_group_client_->async_send_goal(goal_msg, send_goal_options);
 
-        // Wait for goal to be accepted first
+        // Wait for goal to be accepted first (without blocking executor)
         RCLCPP_INFO(this->get_logger(), "Waiting for goal acceptance...");
-        if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), goal_handle_future, std::chrono::seconds(5))
-            != rclcpp::FutureReturnCode::SUCCESS) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to get goal acceptance response!");
-            return false;
-        }
+        auto goal_start_time = this->now();
+        while (rclcpp::ok()) {
+            auto status = goal_handle_future.wait_for(std::chrono::milliseconds(100));
 
-        auto goal_handle = goal_handle_future.get();
-        if (!goal_handle) {
-            RCLCPP_ERROR(this->get_logger(), "Goal was rejected by server!");
-            return false;
+            if (status == std::future_status::ready) {
+                auto goal_handle = goal_handle_future.get();
+                if (!goal_handle) {
+                    RCLCPP_ERROR(this->get_logger(), "Goal was rejected by MoveIt!");
+                    return false;
+                }
+                RCLCPP_INFO(this->get_logger(), "Goal was accepted, waiting for result...");
+                break;
+            }
+
+            if ((this->now() - goal_start_time) > rclcpp::Duration::from_seconds(5.0)) {
+                RCLCPP_ERROR(this->get_logger(), "Timeout waiting for goal acceptance!");
+                return false;
+            }
+
+            rclcpp::spin_some(this->get_node_base_interface());
         }
-        RCLCPP_INFO(this->get_logger(), "Goal was accepted, waiting for result...");
 
         // Spin while waiting for result (allow callbacks to be processed)
         auto start_time = this->now();
