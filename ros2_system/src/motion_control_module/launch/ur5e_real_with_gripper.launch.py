@@ -6,7 +6,7 @@ This replaces the setupRealur5eSystemVisualisation.sh script
 
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, TimerAction, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, TimerAction, IncludeLaunchDescription, ExecuteProcess
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
@@ -73,9 +73,22 @@ def generate_launch_description():
         }.items(),
     )
 
-    # 2. Launch MoveIt with gripper configuration (delayed to allow driver to start)
+    # 2. Activate the scaled_joint_trajectory_controller (after driver starts)
+    activate_controller = TimerAction(
+        period=5.0,  # Wait 5 seconds for driver to start
+        actions=[
+            ExecuteProcess(
+                cmd=['ros2', 'control', 'switch_controllers',
+                     '--activate', 'scaled_joint_trajectory_controller'],
+                output='screen',
+                shell=False
+            )
+        ],
+    )
+
+    # 3. Launch MoveIt with gripper configuration (delayed to allow driver and controller to start)
     moveit_launch = TimerAction(
-        period=10.0,  # Wait 10 seconds for driver to initialize
+        period=12.0,  # Wait 12 seconds for driver and controller to initialize
         actions=[
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
@@ -97,6 +110,7 @@ def generate_launch_description():
     return LaunchDescription(
         declared_arguments + [
             ur_control_launch,
+            activate_controller,
             moveit_launch,
         ]
     )
