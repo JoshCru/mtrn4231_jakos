@@ -7,4 +7,3 @@ gnome-terminal -t "MoveitServer" -e 'ros2 launch ur_moveit_config ur_moveit.laun
 
 
 
-
