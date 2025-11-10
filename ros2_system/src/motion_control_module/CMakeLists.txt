@@ -17,33 +17,6 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(sort_interfaces REQUIRED)
 
-# gripper_controller_node executable (lifecycle node)
-add_executable(gripper_controller_node src/gripper_controller_node.cpp)
-target_include_directories(gripper_controller_node PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-ament_target_dependencies(gripper_controller_node
-  rclcpp
-  rclcpp_lifecycle
-  std_msgs
-  sensor_msgs
-  sort_interfaces
-)
-
-# gripper_button_interface executable
-add_executable(gripper_button_interface src/gripper_button_interface.cpp)
-ament_target_dependencies(gripper_button_interface
-  rclcpp
-  sort_interfaces
-)
-
-# Install targets
-install(TARGETS
-  gripper_controller_node
-  gripper_button_interface
-  DESTINATION lib/${PROJECT_NAME}
-)
-
 # Install launch files, config, urdf, meshes, and scripts
 install(DIRECTORY
   launch

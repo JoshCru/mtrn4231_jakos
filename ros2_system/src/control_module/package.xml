@@ -3,7 +3,7 @@
 <package format="3">
   <name>control_module</name>
   <version>0.1.0</version>
-  <description>Control module for robot driver and pick/place operations</description>
+  <description>Control module for robot driver, gripper control, and pick/place operations</description>
   <maintainer email="user@todo.todo">Your Name</maintainer>
   <license>MIT</license>
 

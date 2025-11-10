@@ -3,15 +3,21 @@
 <package format="3">
   <name>supervisor_module</name>
   <version>0.1.0</version>
-  <description>Supervisor module for system control and coordination</description>
+  <description>Supervisor module for system control and coordination with UI dashboard</description>
   <maintainer email="user@todo.todo">Your Name</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
 
   <depend>rclcpp</depend>
+  <depend>rclpy</depend>
   <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
   <depend>sort_interfaces</depend>
+
+  <exec_depend>python3-pyqt5</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

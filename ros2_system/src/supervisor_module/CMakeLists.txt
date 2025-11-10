@@ -11,11 +11,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sort_interfaces REQUIRED)
 
-# system_controller_node executable
+# system_controller_node executable (C++)
 add_executable(system_controller_node src/system_controller_node.cpp)
 ament_target_dependencies(system_controller_node
   rclcpp
@@ -23,10 +25,20 @@ ament_target_dependencies(system_controller_node
   sort_interfaces
 )
 
-# Install targets
+# Install C++ targets
 install(TARGETS
   system_controller_node
   DESTINATION lib/${PROJECT_NAME}
+)
+
+# Install Python module
+ament_python_install_package(${PROJECT_NAME})
+
+# Install Python executables
+install(PROGRAMS
+  supervisor_module/system_dashboard.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME system_dashboard
 )
 
 # Install launch files and config
