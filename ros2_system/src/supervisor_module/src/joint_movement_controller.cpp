@@ -224,19 +224,31 @@ private:
 
         auto goal_handle_future = move_group_client_->async_send_goal(goal_msg, send_goal_options);
 
-        // Wait for result with timeout (30 seconds for movement)
-        auto status = result_future.wait_for(std::chrono::seconds(30));
+        // Spin while waiting for result (allow callbacks to be processed)
+        auto start_time = this->now();
+        auto timeout = rclcpp::Duration::from_seconds(30.0);
 
-        if (status == std::future_status::timeout) {
-            RCLCPP_ERROR(this->get_logger(), "Timeout waiting for movement to complete");
-            return false;
-        } else if (status == std::future_status::ready) {
-            bool success = result_future.get();
-            return success;
-        } else {
-            RCLCPP_ERROR(this->get_logger(), "Unexpected future status");
-            return false;
+        while (rclcpp::ok()) {
+            // Check if we got a result
+            auto status = result_future.wait_for(std::chrono::milliseconds(100));
+
+            if (status == std::future_status::ready) {
+                bool success = result_future.get();
+                return success;
+            }
+
+            // Check for timeout
+            if ((this->now() - start_time) > timeout) {
+                RCLCPP_ERROR(this->get_logger(), "Timeout waiting for movement to complete (30s)");
+                return false;
+            }
+
+            // Spin to process callbacks
+            rclcpp::spin_some(this->get_node_base_interface());
         }
+
+        RCLCPP_ERROR(this->get_logger(), "Node shutdown while waiting for result");
+        return false;
     }
 
     // Member variables
