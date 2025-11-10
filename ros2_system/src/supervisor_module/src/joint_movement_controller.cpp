@@ -180,40 +180,61 @@ private:
         // Send goal
         RCLCPP_INFO(this->get_logger(), "Sending goal to MoveIt...");
 
-        // Send goal without callbacks (we'll wait synchronously)
-        auto goal_handle_future = move_group_client_->async_send_goal(goal_msg);
+        // Use a promise to track completion
+        auto result_promise = std::make_shared<std::promise<bool>>();
+        auto result_future = result_promise->get_future();
 
-        // Wait for the goal to be accepted (with timeout)
-        auto status = goal_handle_future.wait_for(std::chrono::seconds(5));
-        if (status != std::future_status::ready) {
-            RCLCPP_ERROR(this->get_logger(), "Timeout waiting for goal to be accepted");
-            return false;
-        }
+        // Send goal with result callback
+        auto send_goal_options = rclcpp_action::Client<MoveGroup>::SendGoalOptions();
 
-        auto goal_handle = goal_handle_future.get();
-        if (!goal_handle) {
-            RCLCPP_ERROR(this->get_logger(), "Goal was rejected by MoveIt");
-            return false;
-        }
+        send_goal_options.result_callback =
+            [this, result_promise](const GoalHandleMoveGroup::WrappedResult & result) {
+                int error_code = result.result->error_code.val;
 
-        RCLCPP_INFO(this->get_logger(), "Goal accepted by MoveIt, executing...");
+                RCLCPP_INFO(this->get_logger(), "Received result with error code: %d", error_code);
 
-        // Wait for result (with timeout)
-        auto result_future = move_group_client_->async_get_result(goal_handle);
+                if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
+                    if (error_code == moveit_msgs::msg::MoveItErrorCodes::SUCCESS) {
+                        RCLCPP_INFO(this->get_logger(), "Movement completed successfully!");
+                        result_promise->set_value(true);
+                    } else {
+                        RCLCPP_ERROR(this->get_logger(), "Movement failed with MoveIt error code: %d", error_code);
+                        result_promise->set_value(false);
+                    }
+                } else if (result.code == rclcpp_action::ResultCode::ABORTED) {
+                    RCLCPP_ERROR(this->get_logger(), "Movement was aborted");
+                    result_promise->set_value(false);
+                } else if (result.code == rclcpp_action::ResultCode::CANCELED) {
+                    RCLCPP_ERROR(this->get_logger(), "Movement was canceled");
+                    result_promise->set_value(false);
+                } else {
+                    RCLCPP_ERROR(this->get_logger(), "Unknown result code");
+                    result_promise->set_value(false);
+                }
+            };
 
-        status = result_future.wait_for(std::chrono::seconds(30));
-        if (status != std::future_status::ready) {
+        send_goal_options.goal_response_callback =
+            [this](GoalHandleMoveGroup::SharedPtr goal_handle) {
+                if (!goal_handle) {
+                    RCLCPP_ERROR(this->get_logger(), "Goal was rejected by MoveIt");
+                } else {
+                    RCLCPP_INFO(this->get_logger(), "Goal accepted by MoveIt, executing...");
+                }
+            };
+
+        auto goal_handle_future = move_group_client_->async_send_goal(goal_msg, send_goal_options);
+
+        // Wait for result with timeout (30 seconds for movement)
+        auto status = result_future.wait_for(std::chrono::seconds(30));
+
+        if (status == std::future_status::timeout) {
             RCLCPP_ERROR(this->get_logger(), "Timeout waiting for movement to complete");
             return false;
-        }
-
-        auto result = result_future.get();
-        int error_code = result.result->error_code.val;
-
-        if (error_code == moveit_msgs::msg::MoveItErrorCodes::SUCCESS) {
-            return true;
+        } else if (status == std::future_status::ready) {
+            bool success = result_future.get();
+            return success;
         } else {
-            RCLCPP_ERROR(this->get_logger(), "Movement failed with error code: %d", error_code);
+            RCLCPP_ERROR(this->get_logger(), "Unexpected future status");
             return false;
         }
     }
