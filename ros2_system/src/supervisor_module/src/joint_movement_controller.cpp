@@ -246,11 +246,34 @@ private:
                 }
             };
 
+        send_goal_options.feedback_callback =
+            [this](GoalHandleMoveGroup::SharedPtr,
+                   const std::shared_ptr<const MoveGroup::Feedback> feedback) {
+                RCLCPP_INFO(this->get_logger(), "Received feedback from MoveIt: %s", feedback->state.c_str());
+            };
+
+        RCLCPP_INFO(this->get_logger(), "Calling async_send_goal...");
         auto goal_handle_future = move_group_client_->async_send_goal(goal_msg, send_goal_options);
+
+        // Wait for goal to be accepted first
+        RCLCPP_INFO(this->get_logger(), "Waiting for goal acceptance...");
+        if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), goal_handle_future, std::chrono::seconds(5))
+            != rclcpp::FutureReturnCode::SUCCESS) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to get goal acceptance response!");
+            return false;
+        }
+
+        auto goal_handle = goal_handle_future.get();
+        if (!goal_handle) {
+            RCLCPP_ERROR(this->get_logger(), "Goal was rejected by server!");
+            return false;
+        }
+        RCLCPP_INFO(this->get_logger(), "Goal was accepted, waiting for result...");
 
         // Spin while waiting for result (allow callbacks to be processed)
         auto start_time = this->now();
         auto timeout = rclcpp::Duration::from_seconds(30.0);
+        int wait_iterations = 0;
 
         while (rclcpp::ok()) {
             // Check if we got a result
@@ -258,13 +281,24 @@ private:
 
             if (status == std::future_status::ready) {
                 bool success = result_future.get();
+                RCLCPP_INFO(this->get_logger(), "Result received after %.1f seconds!",
+                           (this->now() - start_time).seconds());
                 return success;
             }
 
             // Check for timeout
-            if ((this->now() - start_time) > timeout) {
+            auto elapsed = (this->now() - start_time);
+            if (elapsed > timeout) {
                 RCLCPP_ERROR(this->get_logger(), "Timeout waiting for movement to complete (30s)");
+                RCLCPP_ERROR(this->get_logger(), "MoveIt did not send a result back!");
                 return false;
+            }
+
+            // Log every 2 seconds to show we're waiting
+            wait_iterations++;
+            if (wait_iterations % 20 == 0) {  // Every 2 seconds (20 * 100ms)
+                RCLCPP_WARN(this->get_logger(), "Still waiting for result... (%.1f seconds elapsed)",
+                           elapsed.seconds());
             }
 
             // Spin to process callbacks
