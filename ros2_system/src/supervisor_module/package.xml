@@ -12,9 +12,11 @@
 
   <depend>rclcpp</depend>
   <depend>rclpy</depend>
+  <depend>rclcpp_action</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
+  <depend>moveit_msgs</depend>
   <depend>sort_interfaces</depend>
 
   <exec_depend>python3-pyqt5</exec_depend>
