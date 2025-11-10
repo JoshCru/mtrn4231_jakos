@@ -6,4 +6,4 @@ gnome-terminal -t "DriverServer" -- bash -c 'ros2 launch ur_robot_driver ur_cont
 
 sleep 10
 
-gnome-terminal -t "MoveitServer" -- bash -c 'ros2 launch ur_moveit_config ur_moveit.launch.py robot_ip:=192.168.0.100 ur_type:=ur5e launch_rviz:=true description_file:=ur5e_with_end_effector.urdf.xacro description_package:=motion_control_module; exec bash'
+gnome-terminal -t "MoveitServer" -- bash -c 'ros2 launch motion_control_module ur5e_moveit_with_gripper.launch.py robot_ip:=192.168.0.100 ur_type:=ur5e launch_rviz:=true; exec bash'
