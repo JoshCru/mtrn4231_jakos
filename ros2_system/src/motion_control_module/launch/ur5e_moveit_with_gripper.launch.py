@@ -8,6 +8,7 @@ from launch.conditions import IfCondition
 from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+from launch_ros.parameter_descriptions import ParameterValue
 from ament_index_python.packages import get_package_share_directory
 
 
@@ -90,7 +91,7 @@ def launch_setup(context, *args, **kwargs):
             "prefix:=", prefix,
         ]
     )
-    robot_description = {"robot_description": robot_description_content}
+    robot_description = {"robot_description": ParameterValue(robot_description_content, value_type=str)}
 
     # MoveIt Configuration - Custom SRDF with gripper
     robot_description_semantic_content = Command(
@@ -104,7 +105,7 @@ def launch_setup(context, *args, **kwargs):
             "prefix:=", prefix,
         ]
     )
-    robot_description_semantic = {"robot_description_semantic": robot_description_semantic_content}
+    robot_description_semantic = {"robot_description_semantic": ParameterValue(robot_description_semantic_content, value_type=str)}
 
     # Kinematics configuration
     robot_description_kinematics = PathJoinSubstitution(
