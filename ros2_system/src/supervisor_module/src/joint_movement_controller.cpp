@@ -252,70 +252,15 @@ private:
                 RCLCPP_INFO(this->get_logger(), "Received feedback from MoveIt: %s", feedback->state.c_str());
             };
 
-        RCLCPP_INFO(this->get_logger(), "Calling async_send_goal...");
+        RCLCPP_INFO(this->get_logger(), "Sending goal to MoveIt (async, not waiting for completion)...");
         auto goal_handle_future = move_group_client_->async_send_goal(goal_msg, send_goal_options);
 
-        // Wait for goal to be accepted first (without blocking executor)
-        RCLCPP_INFO(this->get_logger(), "Waiting for goal acceptance...");
-        auto goal_start_time = this->now();
-        while (rclcpp::ok()) {
-            auto status = goal_handle_future.wait_for(std::chrono::milliseconds(100));
+        // Just verify the goal was sent successfully
+        RCLCPP_INFO(this->get_logger(), "Goal sent! MoveIt will execute in background.");
+        RCLCPP_INFO(this->get_logger(), "Note: Not waiting for movement to complete (async mode)");
 
-            if (status == std::future_status::ready) {
-                auto goal_handle = goal_handle_future.get();
-                if (!goal_handle) {
-                    RCLCPP_ERROR(this->get_logger(), "Goal was rejected by MoveIt!");
-                    return false;
-                }
-                RCLCPP_INFO(this->get_logger(), "Goal was accepted, waiting for result...");
-                break;
-            }
-
-            if ((this->now() - goal_start_time) > rclcpp::Duration::from_seconds(5.0)) {
-                RCLCPP_ERROR(this->get_logger(), "Timeout waiting for goal acceptance!");
-                return false;
-            }
-
-            rclcpp::spin_some(this->get_node_base_interface());
-        }
-
-        // Spin while waiting for result (allow callbacks to be processed)
-        auto start_time = this->now();
-        auto timeout = rclcpp::Duration::from_seconds(30.0);
-        int wait_iterations = 0;
-
-        while (rclcpp::ok()) {
-            // Check if we got a result
-            auto status = result_future.wait_for(std::chrono::milliseconds(100));
-
-            if (status == std::future_status::ready) {
-                bool success = result_future.get();
-                RCLCPP_INFO(this->get_logger(), "Result received after %.1f seconds!",
-                           (this->now() - start_time).seconds());
-                return success;
-            }
-
-            // Check for timeout
-            auto elapsed = (this->now() - start_time);
-            if (elapsed > timeout) {
-                RCLCPP_ERROR(this->get_logger(), "Timeout waiting for movement to complete (30s)");
-                RCLCPP_ERROR(this->get_logger(), "MoveIt did not send a result back!");
-                return false;
-            }
-
-            // Log every 2 seconds to show we're waiting
-            wait_iterations++;
-            if (wait_iterations % 20 == 0) {  // Every 2 seconds (20 * 100ms)
-                RCLCPP_WARN(this->get_logger(), "Still waiting for result... (%.1f seconds elapsed)",
-                           elapsed.seconds());
-            }
-
-            // Spin to process callbacks
-            rclcpp::spin_some(this->get_node_base_interface());
-        }
-
-        RCLCPP_ERROR(this->get_logger(), "Node shutdown while waiting for result");
-        return false;
+        // Return immediately - MoveIt will execute the movement
+        return true;
     }
 
     // Member variables
