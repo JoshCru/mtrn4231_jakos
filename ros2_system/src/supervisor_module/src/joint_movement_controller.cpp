@@ -42,29 +42,53 @@ public:
             "wrist_3_joint"         // Joint 5
         };
 
+        RCLCPP_INFO(this->get_logger(), "========================================");
+        RCLCPP_INFO(this->get_logger(), "Joint Movement Controller starting...");
+        RCLCPP_INFO(this->get_logger(), "========================================");
+
         // Create MoveIt action client
+        RCLCPP_INFO(this->get_logger(), "Creating action client for /move_action...");
         move_group_client_ = rclcpp_action::create_client<MoveGroup>(
             this, "/move_action");
 
         // Subscribe to joint states
+        RCLCPP_INFO(this->get_logger(), "Subscribing to /joint_states...");
         joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
             "/joint_states", 10,
             std::bind(&JointMovementController::joint_state_callback, this, std::placeholders::_1));
 
         // Create service for moving to joint positions
+        RCLCPP_INFO(this->get_logger(), "Creating service /move_to_joint_position...");
         move_service_ = this->create_service<sort_interfaces::srv::MoveToJointPosition>(
             "/move_to_joint_position",
             std::bind(&JointMovementController::handle_move_request, this,
                      std::placeholders::_1, std::placeholders::_2));
 
-        RCLCPP_INFO(this->get_logger(), "Joint Movement Controller initialized");
-        RCLCPP_INFO(this->get_logger(), "Waiting for MoveIt action server...");
+        RCLCPP_INFO(this->get_logger(), "========================================");
+        RCLCPP_INFO(this->get_logger(), "Waiting for MoveIt action server at /move_action...");
+        RCLCPP_INFO(this->get_logger(), "(Make sure MoveIt is running!)");
+        RCLCPP_INFO(this->get_logger(), "========================================");
 
-        // Wait for action server
-        if (!move_group_client_->wait_for_action_server(std::chrono::seconds(10))) {
-            RCLCPP_ERROR(this->get_logger(), "MoveIt action server not available!");
+        // Wait for action server with better feedback
+        int wait_count = 0;
+        while (!move_group_client_->wait_for_action_server(std::chrono::seconds(1)) && wait_count < 30) {
+            wait_count++;
+            if (wait_count % 5 == 0) {
+                RCLCPP_WARN(this->get_logger(), "Still waiting for MoveIt... (%d seconds)", wait_count);
+            }
+        }
+
+        if (wait_count >= 30) {
+            RCLCPP_ERROR(this->get_logger(), "========================================");
+            RCLCPP_ERROR(this->get_logger(), "TIMEOUT: MoveIt action server not available!");
+            RCLCPP_ERROR(this->get_logger(), "Check that MoveIt is running:");
+            RCLCPP_ERROR(this->get_logger(), "  ros2 action list | grep move_action");
+            RCLCPP_ERROR(this->get_logger(), "========================================");
         } else {
-            RCLCPP_INFO(this->get_logger(), "Connected to MoveIt action server");
+            RCLCPP_INFO(this->get_logger(), "========================================");
+            RCLCPP_INFO(this->get_logger(), "✓ Connected to MoveIt action server!");
+            RCLCPP_INFO(this->get_logger(), "✓ Service ready at /move_to_joint_position");
+            RCLCPP_INFO(this->get_logger(), "========================================");
         }
     }
 
