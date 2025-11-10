@@ -3,6 +3,16 @@
 Square Box Movement Script for UR5e
 Moves the end effector in a square pattern while maintaining constant z-axis
 and restricting joints to avoid singularities.
+
+Joint Numbering Convention:
+  Joint 6 = shoulder_pan_joint (base rotation)
+  Joint 1 = shoulder_lift_joint
+  Joint 2 = elbow_joint
+  Joint 3 = wrist_1_joint
+  Joint 4 = wrist_2_joint
+  Joint 5 = wrist_3_joint
+
+Joint order in arrays: [Joint6, Joint1, Joint2, Joint3, Joint4, Joint5]
 """
 
 import rclpy
@@ -41,13 +51,14 @@ class SquareMovementNode(Node):
 
         # Joint limits to avoid singularities (in radians)
         # Restricting shoulder_lift and elbow to safe ranges
+        # Joint mapping: Joint6 (base), Joint1, Joint2, Joint3, Joint4, Joint5
         self.joint_constraints = {
-            'shoulder_pan_joint': (-3.14, 3.14),     # Full range
-            'shoulder_lift_joint': (-2.0, -0.5),     # Restricted to avoid upward pointing
-            'elbow_joint': (-2.5, -0.5),             # Restricted elbow range
-            'wrist_1_joint': (-3.14, 3.14),          # Full range
-            'wrist_2_joint': (-3.14, 3.14),          # Full range
-            'wrist_3_joint': (-3.14, 3.14),          # Full range
+            'shoulder_pan_joint': (-3.14, 3.14),     # Joint 6 (base) - Full range
+            'shoulder_lift_joint': (-2.0, -0.5),     # Joint 1 - Restricted to avoid upward pointing
+            'elbow_joint': (-2.5, -0.5),             # Joint 2 - Restricted elbow range
+            'wrist_1_joint': (-3.14, 3.14),          # Joint 3 - Full range
+            'wrist_2_joint': (-3.14, 3.14),          # Joint 4 - Full range
+            'wrist_3_joint': (-3.14, 3.14),          # Joint 5 - Full range
         }
 
         self.get_logger().info("Square Movement Node initialized")

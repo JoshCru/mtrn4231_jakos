@@ -3,6 +3,17 @@
 Pickup Movement Script for UR5e using MoveIt
 Moves through pick-up, lift, and put-down positions with user confirmation.
 Supports saving and loading custom sequences.
+
+Joint Numbering Convention:
+  Joint 6 = shoulder_pan_joint (base rotation)
+  Joint 1 = shoulder_lift_joint
+  Joint 2 = elbow_joint
+  Joint 3 = wrist_1_joint
+  Joint 4 = wrist_2_joint
+  Joint 5 = wrist_3_joint
+
+Joint order in arrays: [Joint6, Joint1, Joint2, Joint3, Joint4, Joint5]
+All sequences are defined in this order.
 """
 
 import rclpy
@@ -63,17 +74,28 @@ class PickupMovement(Node):
         self.current_joint_state = msg
 
     def get_current_joint_positions(self):
-        """Get current joint positions in order"""
+        """Get current joint positions in order
+
+        Joint numbering: Joint6 (base), Joint1, Joint2, Joint3, Joint4, Joint5
+        Mapping:
+            Index 0: shoulder_pan_joint  = Joint 6 (base rotation)
+            Index 1: shoulder_lift_joint = Joint 1
+            Index 2: elbow_joint         = Joint 2
+            Index 3: wrist_1_joint       = Joint 3
+            Index 4: wrist_2_joint       = Joint 4
+            Index 5: wrist_3_joint       = Joint 5
+        """
         if not self.current_joint_state:
             return None
 
+        # Joint order: [Joint6, Joint1, Joint2, Joint3, Joint4, Joint5]
         joint_names = [
-            'shoulder_pan_joint',
-            'shoulder_lift_joint',
-            'elbow_joint',
-            'wrist_1_joint',
-            'wrist_2_joint',
-            'wrist_3_joint'
+            'shoulder_pan_joint',   # Joint 6 (base)
+            'shoulder_lift_joint',  # Joint 1
+            'elbow_joint',          # Joint 2
+            'wrist_1_joint',        # Joint 3
+            'wrist_2_joint',        # Joint 4
+            'wrist_3_joint'         # Joint 5
         ]
 
         positions = []
@@ -146,16 +168,21 @@ class PickupMovement(Node):
         return sorted(sequences)
 
     def get_default_sequence(self):
-        """Get the default pickup sequence"""
+        """Get the default pickup sequence
+
+        Joint order: [Joint6, Joint1, Joint2, Joint3, Joint4, Joint5]
+        Which maps to: [base, shoulder_lift, elbow, wrist_1, wrist_2, wrist_3]
+        """
         import math
 
         # Define in degrees (will be sent as-is to MoveIt)
+        # Format: [Joint6, Joint1, Joint2, Joint3, Joint4, Joint5]
         sequences_degrees = [
-            ('Home point', [0.0, -75.0, 90.0, -105.0, -90.0, 0.0]),
-            ('Pick up point', [0.0, -53.0, 88.0, -127.0, -86.0, 9.0]),
-            ('Lift up point', [-12.0, -60.0, 82.0, -113.0, -86.0, 9.0]),
-            ('Put down point', [-12.0, -53.0, 88.0, -126.0, -86.0, 9.0]),
-            ('Home point (return)', [0.0, -75.0, 90.0, -105.0, -90.0, 0.0])
+            ('Home point',         [0.0, -75.0,  90.0, -105.0, -90.0,  0.0]),  # [J6, J1, J2, J3, J4, J5]
+            ('Pick up point',      [0.0, -53.0,  88.0, -127.0, -86.0,  9.0]),
+            ('Lift up point',    [-12.0, -60.0,  82.0, -113.0, -86.0,  9.0]),
+            ('Put down point',   [-12.0, -53.0,  88.0, -126.0, -86.0,  9.0]),
+            ('Home point (return)', [0.0, -75.0,  90.0, -105.0, -90.0,  0.0])
         ]
 
         positions = []
@@ -225,7 +252,12 @@ class PickupMovement(Node):
             return waypoints
 
     def move_to_joint_positions(self, joint_positions, duration_sec=5.0):
-        """Plan and execute movement to joint positions using MoveIt"""
+        """Plan and execute movement to joint positions using MoveIt
+
+        Args:
+            joint_positions: List of 6 joint positions in order [Joint6, Joint1, Joint2, Joint3, Joint4, Joint5]
+            duration_sec: Duration for movement (not used with MoveIt)
+        """
         if not self.move_group_client.wait_for_server(timeout_sec=5.0):
             self.get_logger().error("MoveIt action server not available!")
             return False
@@ -242,13 +274,14 @@ class PickupMovement(Node):
         goal_msg.request.max_acceleration_scaling_factor = 0.2
 
         # Set joint constraints (target positions)
+        # Joint order: [Joint6, Joint1, Joint2, Joint3, Joint4, Joint5]
         joint_names = [
-            'shoulder_pan_joint',
-            'shoulder_lift_joint',
-            'elbow_joint',
-            'wrist_1_joint',
-            'wrist_2_joint',
-            'wrist_3_joint'
+            'shoulder_pan_joint',   # Joint 6 (base)
+            'shoulder_lift_joint',  # Joint 1
+            'elbow_joint',          # Joint 2
+            'wrist_1_joint',        # Joint 3
+            'wrist_2_joint',        # Joint 4
+            'wrist_3_joint'         # Joint 5
         ]
 
         constraints = Constraints()
