@@ -130,17 +130,23 @@ class WeightDetector(Node):
         self.torque_history = [deque(maxlen=self.history_length) for _ in range(self.num_joints)]
         self.filtered_torque_history = [deque(maxlen=self.history_length) for _ in range(self.num_joints)]
         
-        self.kalman_filters = [KalmanFilter(process_variance=0.0015, measurement_variance=0.04) 
-                               for _ in range(self.num_joints)]
+        # Original values: proc_var = 0.0005, meas_var = 0.15
+        self.kalman_filters = []
+        for i in range(self.num_joints):
+            if i == 3:  # Joint 4 - wavy pattern, needs more smoothing
+                kf = KalmanFilter(process_variance=0.015, measurement_variance=0.15)
+            else:  # All other joints
+                kf = KalmanFilter(process_variance=0.015, measurement_variance=0.15)
+            self.kalman_filters.append(kf)
         
         self.kinematics = UR5eKinematics()
         
         self.calibration_factor = 5.0
-        self.active_joints = [0, 1]
+        self.active_joints = [1, 2]
         
         self.baseline_torques = None
         self.baseline_samples = []
-        self.baseline_sample_size = 10
+        self.baseline_sample_size = 20
         self.calibrating_baseline = True
         
         self.current_joint_angles = None
@@ -188,6 +194,7 @@ class WeightDetector(Node):
         self.get_logger().info('Weight detection module initialized - calibrating baseline...')
         self.get_logger().info('Using proper 3D moment arm calculations')
         self.get_logger().info('Note: UR5e joints reordered from [6,1,2,3,4,5] to [1,2,3,4,5,6] for display')
+        self.get_logger().info(f'Active joints for mass estimation: {[j+1 for j in self.active_joints]}')
     
     def update_parameters(self):
         self.calibration_factor = self.get_parameter('calibration_factor').value
@@ -200,8 +207,6 @@ class WeightDetector(Node):
         if len(joint_torques) < self.num_joints or len(joint_positions) < self.num_joints:
             return
         
-        # UR5e returns joints in order: [6, 1, 2, 3, 4, 5] (indices [5, 0, 1, 2, 3, 4])
-        # Reorder to standard [1, 2, 3, 4, 5, 6] for display and physics
         reorder_indices = [5, 0, 1, 2, 3, 4]
         joint_torques_reordered = [joint_torques[i] for i in reorder_indices]
         joint_positions_reordered = [joint_positions[i] for i in reorder_indices]
@@ -215,16 +220,16 @@ class WeightDetector(Node):
             self.filtered_torque_history[i].append(filtered_torque)
             filtered_torques.append(filtered_torque)
         
-        # Use joints 2, 3, 4 (indices 1, 2, 3 after reordering)
         if self.calibrating_baseline:
-            self.baseline_samples.append(filtered_torques[1:4])
+            active_torques = [filtered_torques[j] for j in self.active_joints]
+            self.baseline_samples.append(active_torques)
             if len(self.baseline_samples) >= self.baseline_sample_size:
                 self.baseline_torques = np.mean(self.baseline_samples, axis=0)
                 self.calibrating_baseline = False
                 self.get_logger().info("Baseline calibration complete")
-                self.get_logger().info(f"Baseline torques for Joints 2,3,4: {self.baseline_torques}")
+                self.get_logger().info(f"Baseline torques for active joints: {self.baseline_torques}")
         else:
-            self.estimate_mass_physics(filtered_torques[1:4])
+            self.estimate_mass_physics(filtered_torques)
         
         self.update_plots()
     
@@ -232,14 +237,13 @@ class WeightDetector(Node):
         if self.baseline_torques is None or self.current_joint_angles is None:
             return
         
-        torque_deltas = np.array(current_torques) - self.baseline_torques
+        active_torques = np.array([current_torques[j] for j in self.active_joints])
+        torque_deltas = active_torques - self.baseline_torques
         
-        moment_arms = self.kinematics.compute_moment_arms(self.current_joint_angles)
+        all_moment_arms = self.kinematics.compute_moment_arms(self.current_joint_angles)
+        active_moment_arms = np.array([all_moment_arms[j-1] for j in self.active_joints])
         
-        selected_torque_deltas = torque_deltas[self.active_joints]
-        selected_moment_arms = moment_arms[self.active_joints]
-        
-        raw_mass = self.kinematics.estimate_mass(selected_torque_deltas, selected_moment_arms)
+        raw_mass = self.kinematics.estimate_mass(torque_deltas, active_moment_arms)
         
         self.estimated_mass_grams = raw_mass * self.calibration_factor * 1000
         
