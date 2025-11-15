@@ -122,6 +122,8 @@ class WeightDetector(Node):
             self.joint_state_callback,
             10
         )
+
+        self.weight_set = [100, 200, 500]
         
         self.mass_publisher = self.create_publisher(Float32, '/estimated_mass', 10)
         
@@ -142,7 +144,7 @@ class WeightDetector(Node):
         self.kinematics = UR5eKinematics()
         
         self.calibration_factor = 5.0
-        self.active_joints = [1, 2]
+        self.active_joints = [1, 2] # Joints 2,3,4 are indices 1,2,3
         
         self.baseline_torques = None
         self.baseline_samples = []
