@@ -13,5 +13,5 @@ ros2 run weight_detection_module weight_detector
 - Publishes current estimated mass to: `/estimated_mass`
 - mass_msg:
   -  Type: **Int32**
-  -  Values: [20, 50, 100, 200, 500]
-  -  Units: Grams
+  -  Values: [0, 20, 50, 100, 200, 500]
+  -  Unit: Grams

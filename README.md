@@ -1,3 +1,4 @@
+### Documentation
 | Module | Documentation |
 |--------|---------------|
 | Weight Detection | [README.md](ros2_system/src/weight_detection_module/README.md) |
@@ -32,7 +33,6 @@ source install/setup.bash
 ros2 launch launch/full_system.launch.py
 
 ```
-
 
 ### Arduino Commands
 Prereq: Ensure Servo in open position (align marker on the gear to 'o' position)
