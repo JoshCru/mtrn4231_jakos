@@ -7,7 +7,6 @@ from std_msgs.msg import Int32
 import numpy as np
 from collections import deque
 import matplotlib.pyplot as plt
-from scipy import stats
 
 class KalmanFilter:
     def __init__(self, process_variance=0.0015, measurement_variance=0.04):
@@ -162,12 +161,8 @@ class WeightDetector(Node):
         self.estimated_mass_grams = 0.0
         self.mass_history = deque(maxlen=self.history_length)
         
-        self.declare_parameter('decay_light', self.decay_light)
-        self.declare_parameter('decay_heavy', self.decay_heavy)
-        self.declare_parameter('mass_threshold', self.mass_threshold)
-        self.declare_parameter('exp_amplitude', self.exp_amplitude)
         self.declare_parameter('active_joints', self.active_joints)
-        
+
         self.param_timer = self.create_timer(0.5, self.update_parameters)
         
         plt.ion()
@@ -203,19 +198,10 @@ class WeightDetector(Node):
         self.mass_ax.set_title('Estimated Mass')
         self.mass_ax.grid(True)
         
-        self.get_logger().info('Weight detection module initialized - calibrating baseline...')
-        self.get_logger().info('Using proper 3D moment arm calculations')
-        self.get_logger().info('Note: UR5e joints reordered from [6,1,2,3,4,5] to [1,2,3,4,5,6] for display')
+        self.get_logger().info('Weight detection module initialised - calibrating baseline...')
         self.get_logger().info(f'Active joints for mass estimation: {[j+1 for j in self.active_joints]}')
-        self.get_logger().info(f'Piecewise exponential calibration: amplitude={self.exp_amplitude}, '
-                              f'light_decay={self.decay_light}, heavy_decay={self.decay_heavy}, '
-                              f'threshold={self.mass_threshold}kg')
     
     def update_parameters(self):
-        self.decay_light = self.get_parameter('decay_light').value
-        self.decay_heavy = self.get_parameter('decay_heavy').value
-        self.mass_threshold = self.get_parameter('mass_threshold').value
-        self.exp_amplitude = self.get_parameter('exp_amplitude').value
         self.active_joints = self.get_parameter('active_joints').value
     
     def joint_state_callback(self, msg):
@@ -244,8 +230,6 @@ class WeightDetector(Node):
             if len(self.baseline_samples) >= self.baseline_sample_size:
                 self.baseline_torques = np.median(self.baseline_samples, axis=0)
 
-                # Remove top/bottom 10%
-                # self.baseline_torques = stats.trim_mean(self.baseline_samples, 0.1, axis=0)  
                 self.calibrating_baseline = False
                 self.get_logger().info("Baseline calibration complete")
                 self.get_logger().info(f"Baseline torques for active joints: {self.baseline_torques}")
@@ -270,7 +254,6 @@ class WeightDetector(Node):
         elif estimated_mass_grams < 12 and closest_weight == 20:
             closest_weight = 0
 
-        print(closest_weight)
         return closest_weight
 
     def estimate_mass_physics(self, current_torques):
@@ -340,7 +323,8 @@ def main(args=None):
         pass
     finally:
         weight_detector.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
