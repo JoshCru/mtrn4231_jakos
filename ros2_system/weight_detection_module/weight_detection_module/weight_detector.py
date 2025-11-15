@@ -3,10 +3,11 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Float32
+from std_msgs.msg import Int32
 import numpy as np
 from collections import deque
 import matplotlib.pyplot as plt
+from scipy import stats
 
 class KalmanFilter:
     def __init__(self, process_variance=0.0015, measurement_variance=0.04):
@@ -123,9 +124,9 @@ class WeightDetector(Node):
             10
         )
 
-        self.weight_set = [100, 200, 500]
+        self.weight_set = [20, 50, 100, 200, 500]
         
-        self.mass_publisher = self.create_publisher(Float32, '/estimated_mass', 10)
+        self.mass_publisher = self.create_publisher(Int32, '/estimated_mass', 10)
         
         self.num_joints = 6
         self.history_length = 100
@@ -133,29 +134,38 @@ class WeightDetector(Node):
         self.filtered_torque_history = [deque(maxlen=self.history_length) for _ in range(self.num_joints)]
         
         # Original values: proc_var = 0.0005, meas_var = 0.15
+        # Alternative: proc_var = 0.0015, meas_var = 0.2
         self.kalman_filters = []
         for i in range(self.num_joints):
-            if i == 3:  # Joint 4 - wavy pattern, needs more smoothing
-                kf = KalmanFilter(process_variance=0.015, measurement_variance=0.15)
-            else:  # All other joints
-                kf = KalmanFilter(process_variance=0.015, measurement_variance=0.15)
+            kf = KalmanFilter(process_variance=0.0005, measurement_variance=0.2)
             self.kalman_filters.append(kf)
         
         self.kinematics = UR5eKinematics()
+
+        self.calibration_factor = 5.0  # Changes dynamically based on estimated mass
+        self.active_joints = [1, 2]    # Joints 2,3,4 are indices 1,2,3
         
-        self.calibration_factor = 5.0
-        self.active_joints = [1, 2] # Joints 2,3,4 are indices 1,2,3
+        # Piecewise exponential calibration parameters
+        self.exp_amplitude = 7.0
+        self.decay_light = 6.15  # For lighter weights
+        self.decay_heavy = 3.35  # For heavier weights
+        self.mass_threshold = 0.05  # Threshold in kg, times by 5 for calibration
+        # e.g. mass_threshold = 0.05, 0.05 * 5 = 0.25kg
+        self.min_threshold = 0.003  # Minimum threshold, values below this are ignored
         
         self.baseline_torques = None
         self.baseline_samples = []
-        self.baseline_sample_size = 20
+        self.baseline_sample_size = 30
         self.calibrating_baseline = True
         
         self.current_joint_angles = None
         self.estimated_mass_grams = 0.0
         self.mass_history = deque(maxlen=self.history_length)
         
-        self.declare_parameter('calibration_factor', self.calibration_factor)
+        self.declare_parameter('decay_light', self.decay_light)
+        self.declare_parameter('decay_heavy', self.decay_heavy)
+        self.declare_parameter('mass_threshold', self.mass_threshold)
+        self.declare_parameter('exp_amplitude', self.exp_amplitude)
         self.declare_parameter('active_joints', self.active_joints)
         
         self.param_timer = self.create_timer(0.5, self.update_parameters)
@@ -197,9 +207,15 @@ class WeightDetector(Node):
         self.get_logger().info('Using proper 3D moment arm calculations')
         self.get_logger().info('Note: UR5e joints reordered from [6,1,2,3,4,5] to [1,2,3,4,5,6] for display')
         self.get_logger().info(f'Active joints for mass estimation: {[j+1 for j in self.active_joints]}')
+        self.get_logger().info(f'Piecewise exponential calibration: amplitude={self.exp_amplitude}, '
+                              f'light_decay={self.decay_light}, heavy_decay={self.decay_heavy}, '
+                              f'threshold={self.mass_threshold}kg')
     
     def update_parameters(self):
-        self.calibration_factor = self.get_parameter('calibration_factor').value
+        self.decay_light = self.get_parameter('decay_light').value
+        self.decay_heavy = self.get_parameter('decay_heavy').value
+        self.mass_threshold = self.get_parameter('mass_threshold').value
+        self.exp_amplitude = self.get_parameter('exp_amplitude').value
         self.active_joints = self.get_parameter('active_joints').value
     
     def joint_state_callback(self, msg):
@@ -226,7 +242,10 @@ class WeightDetector(Node):
             active_torques = [filtered_torques[j] for j in self.active_joints]
             self.baseline_samples.append(active_torques)
             if len(self.baseline_samples) >= self.baseline_sample_size:
-                self.baseline_torques = np.mean(self.baseline_samples, axis=0)
+                self.baseline_torques = np.median(self.baseline_samples, axis=0)
+
+                # Remove top/bottom 10%
+                # self.baseline_torques = stats.trim_mean(self.baseline_samples, 0.1, axis=0)  
                 self.calibrating_baseline = False
                 self.get_logger().info("Baseline calibration complete")
                 self.get_logger().info(f"Baseline torques for active joints: {self.baseline_torques}")
@@ -235,26 +254,58 @@ class WeightDetector(Node):
         
         self.update_plots()
     
+    def snap_to_weight_set(self, estimated_mass_grams):
+        """Find the closest weight in weight_set to the estimated mass.
+        Special rule: if mass > 30g, don't snap to 20g (use 50g instead)."""
+
+        # Find closest weight
+        weight_array = np.array(self.weight_set)
+        differences = np.abs(weight_array - estimated_mass_grams)
+        closest_idx = np.argmin(differences)
+        closest_weight = self.weight_set[closest_idx]
+
+        # Special case: if > 30g and matched to 20g, use 50g instead
+        if estimated_mass_grams > 30 and closest_weight == 20:
+            closest_weight = 50
+        elif estimated_mass_grams < 12 and closest_weight == 20:
+            closest_weight = 0
+
+        print(closest_weight)
+        return closest_weight
+
     def estimate_mass_physics(self, current_torques):
         if self.baseline_torques is None or self.current_joint_angles is None:
             return
-        
+
         active_torques = np.array([current_torques[j] for j in self.active_joints])
         torque_deltas = active_torques - self.baseline_torques
-        
+
         all_moment_arms = self.kinematics.compute_moment_arms(self.current_joint_angles)
         active_moment_arms = np.array([all_moment_arms[j-1] for j in self.active_joints])
+
+        raw_mass = abs(self.kinematics.estimate_mass(torque_deltas, active_moment_arms))
         
-        raw_mass = self.kinematics.estimate_mass(torque_deltas, active_moment_arms)
-        
+        # Piecewise exponential calibration factor
+        if raw_mass < self.min_threshold:
+            self.calibration_factor = 0.0
+        elif raw_mass < self.mass_threshold:
+            # Use higher decay rate for lighter weights
+            self.calibration_factor = self.exp_amplitude * np.exp(-self.decay_light * raw_mass)
+        else:
+            # Use lower decay rate for heavier weights
+            self.calibration_factor = self.exp_amplitude * np.exp(-self.decay_heavy * raw_mass)
+
         self.estimated_mass_grams = raw_mass * self.calibration_factor * 1000
-        
+
         self.estimated_mass_grams = round(self.estimated_mass_grams / 5) * 5
-        
+
         self.mass_history.append(self.estimated_mass_grams)
-        
-        mass_msg = Float32()
-        mass_msg.data = self.estimated_mass_grams / 1000.0
+
+        # Snap to closest weight in weight_set
+        snapped_mass_grams = self.snap_to_weight_set(self.estimated_mass_grams)
+
+        mass_msg = Int32()
+        mass_msg.data = int(snapped_mass_grams)
         self.mass_publisher.publish(mass_msg)
     
     def update_plots(self):
