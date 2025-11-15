@@ -10,7 +10,8 @@ source install/setup.bash
 ros2 run weight_detection_module weight_detector
 ```
 
-- Publishes estimated mass in grams to: `/estimated_mass`
-- Mass:
+- Publishes current estimated mass to: `/estimated_mass`
+- mass_msg:
   -  Type: **Int32**
   -  Values: [20, 50, 100, 200, 500]
+  -  Units: Grams
