@@ -1,6 +1,6 @@
 | Module | Documentation |
 |--------|---------------|
-|   Weight Detection     |        `./ros2_system/weight_detection_module/README.md`       |
+|   Weight Detection     |        `ros2_system/weight_detection_module/README.md`       |
 |        |               |
 
 ### Arduino Commands
