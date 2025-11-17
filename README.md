@@ -299,3 +299,7 @@ MIT License
 ## Author
 
 MTRN4231 - Advanced Robotics Project
+**Commands:**
+- 'W' - open gripper
+- 'S' - close gripper
+- 'E \<weight\>' - edit close (grip) angle
