@@ -99,16 +99,16 @@ def generate_launch_description():
         ])
     )
 
-    # Motion control module
-    motion_control_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            PathJoinSubstitution([
-                FindPackageShare('motion_control_module'),
-                'launch',
-                'motion_control.launch.py'
-            ])
-        ])
-    )
+    # Motion control module - REMOVED: gripper_controller_node moved to control_module
+    # motion_control_launch = IncludeLaunchDescription(
+    #     PythonLaunchDescriptionSource([
+    #         PathJoinSubstitution([
+    #             FindPackageShare('motion_control_module'),
+    #             'launch',
+    #             'motion_control.launch.py'
+    #         ])
+    #     ])
+    # )
 
     # Optional: RViz for visualization
     rviz_node = Node(
@@ -149,7 +149,7 @@ def generate_launch_description():
         recognition_launch,
         planning_launch,
         control_launch,
-        motion_control_launch,
+        # motion_control_launch,  # REMOVED: gripper_controller_node moved to control_module
 
         # Brain Dashboard UI (delayed)
         delayed_dashboard,

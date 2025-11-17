@@ -63,7 +63,7 @@ ros2 launch motion_control_module ur5e_real_with_gripper.launch.py
 source ~/Documents/mtrn4231_jakos/ros2_system/install/setup.bash
 
 # Run the joint movement controller
-ros2 run supervisor_module joint_movement_controller
+ros2 run motion_control_module joint_movement_controller
 ```
 
 ### Step 3: Test with Example Client
@@ -73,7 +73,7 @@ ros2 run supervisor_module joint_movement_controller
 source ~/Documents/mtrn4231_jakos/ros2_system/install/setup.bash
 
 # Run the example client
-ros2 run supervisor_module joint_movement_client_example
+python3 ~/Documents/mtrn4231_jakos/ros2_system/src/motion_control_module/scripts/joint_movement_client_example.py
 ```
 
 ## Service Interface
@@ -209,7 +209,7 @@ ros2 run motion_control_module check_joint_states.py
 ## Files
 
 - `src/joint_movement_controller.cpp` - C++ service node
-- `supervisor_module/joint_movement_client_example.py` - Python example client
+- `scripts/joint_movement_client_example.py` - Python example client
 - `srv/MoveToJointPosition.srv` - Service definition (in sort_interfaces package)
 
 ## Dependencies

@@ -32,18 +32,6 @@ ament_target_dependencies(system_controller_node
   sort_interfaces
 )
 
-# joint_movement_controller executable (C++)
-add_executable(joint_movement_controller src/joint_movement_controller.cpp)
-ament_target_dependencies(joint_movement_controller
-  rclcpp
-  rclcpp_action
-  std_msgs
-  sensor_msgs
-  geometry_msgs
-  moveit_msgs
-  sort_interfaces
-)
-
 # brain_node executable (C++)
 add_executable(brain_node src/brain_node.cpp)
 ament_target_dependencies(brain_node
@@ -57,7 +45,6 @@ ament_target_dependencies(brain_node
 # Install C++ targets
 install(TARGETS
   system_controller_node
-  joint_movement_controller
   brain_node
   DESTINATION lib/${PROJECT_NAME}
 )
@@ -76,12 +63,6 @@ install(PROGRAMS
   supervisor_module/brain_dashboard.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME brain_dashboard
-)
-
-install(PROGRAMS
-  supervisor_module/joint_movement_client_example.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME joint_movement_client_example
 )
 
 # Install launch files and config

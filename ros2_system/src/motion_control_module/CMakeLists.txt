@@ -13,9 +13,30 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(moveit_msgs REQUIRED)
 find_package(sort_interfaces REQUIRED)
+
+# joint_movement_controller executable (C++)
+add_executable(joint_movement_controller src/joint_movement_controller.cpp)
+ament_target_dependencies(joint_movement_controller
+  rclcpp
+  rclcpp_action
+  std_msgs
+  sensor_msgs
+  geometry_msgs
+  moveit_msgs
+  sort_interfaces
+)
+
+# Install C++ targets
+install(TARGETS
+  joint_movement_controller
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 # Install launch files, config, urdf, scripts, srdf, and meshes
 install(DIRECTORY

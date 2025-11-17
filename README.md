@@ -52,9 +52,13 @@ Custom messages, services, and actions used throughout the system.
 - `robot_driver_node` - UR5e interface (lifecycle node)
 - `pick_operation_node` - Pick state machine
 - `place_operation_node` - Place state machine
-
-### 7. **motion_control_module** - Gripper Control
 - `gripper_controller_node` - Arduino servo gripper with weight sensor (lifecycle node)
+
+### 7. **motion_control_module** - Robot Arm Motion Control
+- `joint_movement_controller` - MoveIt-based joint position controller service
+- Robot URDF/SRDF descriptions and meshes
+- Launch files for UR5e with gripper
+- See [JOINT_MOVEMENT_README.md](ros2_system/src/motion_control_module/JOINT_MOVEMENT_README.md) for detailed usage
 
 ## Building the System
 
@@ -96,8 +100,8 @@ ros2 launch planning_module planning.launch.py
 # Control
 ros2 launch control_module control.launch.py
 
-# Motion Control (Gripper)
-ros2 launch motion_control_module motion_control.launch.py
+# Motion Control (Joint Movement Controller)
+ros2 run motion_control_module joint_movement_controller
 ```
 
 ## Configuration
@@ -108,8 +112,7 @@ Key configuration files:
 - `supervisor_module/config/system_controller.yaml` - Target areas, system settings
 - `perception_module/config/perception.yaml` - Camera and detection parameters
 - `planning_module/config/planning.yaml` - Sorting strategy, workspace limits
-- `control_module/config/control.yaml` - Robot IP, pick/place parameters
-- `motion_control_module/config/motion_control.yaml` - Arduino serial port, calibration
+- `control_module/config/control.yaml` - Robot IP, pick/place parameters, gripper serial port
 
 ## Hardware Setup
 
