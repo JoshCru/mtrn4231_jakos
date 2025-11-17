@@ -54,21 +54,8 @@ def generate_launch_description():
     launch_rviz = LaunchConfiguration("launch_rviz")
     use_fake_hardware = LaunchConfiguration("use_fake_hardware")
 
-    # Config file paths - use defaults from ur_description
-    joint_limit_params = PathJoinSubstitution(
-        [FindPackageShare("ur_description"), "config", ur_type, "joint_limits.yaml"]
-    )
-    kinematics_params = PathJoinSubstitution(
-        [FindPackageShare("ur_description"), "config", ur_type, "default_kinematics.yaml"]
-    )
-    physical_params = PathJoinSubstitution(
-        [FindPackageShare("ur_description"), "config", ur_type, "physical_parameters.yaml"]
-    )
-    visual_params = PathJoinSubstitution(
-        [FindPackageShare("ur_description"), "config", ur_type, "visual_parameters.yaml"]
-    )
-
     # 1. Launch UR Robot Driver with custom description (gripper included)
+    # Let ur_control.launch.py construct config paths from description_package
     ur_control_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution([
@@ -84,11 +71,6 @@ def generate_launch_description():
             "launch_rviz": "false",  # Don't launch RViz from driver
             "description_file": "ur5e_with_end_effector.urdf.xacro",
             "description_package": "motion_control_module",
-            # Use ur_description defaults for config files
-            "joint_limit_params": joint_limit_params,
-            "kinematics_params": kinematics_params,
-            "physical_params": physical_params,
-            "visual_params": visual_params,
         }.items(),
     )
 
