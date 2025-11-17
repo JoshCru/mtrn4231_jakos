@@ -136,7 +136,7 @@ class WeightDetector(Node):
         # Alternative: proc_var = 0.0015, meas_var = 0.2
         self.kalman_filters = []
         for i in range(self.num_joints):
-            kf = KalmanFilter(process_variance=0.0005, measurement_variance=0.2)
+            kf = KalmanFilter(process_variance=0.0005, measurement_variance=0.02)
             self.kalman_filters.append(kf)
         
         self.kinematics = UR5eKinematics()
@@ -145,22 +145,23 @@ class WeightDetector(Node):
         self.active_joints = [1, 2]    # Joints 2,3,4 are indices 1,2,3
         
         # Piecewise exponential calibration parameters
-        self.exp_amplitude = 7.0
+        self.exp_amplitude = 7  # Increased from 7.0 to compensate for post-lift baseline shift
 
         # If running all packages simultaneously
-        self.decay_light = 5.75  # For lighter weights
-        self.decay_heavy = 2.95  # For heavier weights
-        
+        self.decay_light = 0.1  # For lighter weights (reduced from 5.75 to compensate for post-lift baseline)
+        self.decay_heavy = 0.1  # For heavier weights (reduced from 2.95 for 500g correction)
+
         # # If package running by itself:
         # self.decay_light = 6.15  # For lighter weights
         # self.decay_heavy = 3.35  # For heavier weights
-        self.mass_threshold = 0.05  # Threshold in kg, times by 5 for calibration
+        self.mass_threshold = 0.095  # Threshold in kg (increased from 0.05 to capture 200g in light formula)
         # e.g. mass_threshold = 0.05, 0.05 * 5 = 0.25kg
+        self.mass_threshold = 0.00643
         self.min_threshold = 0.003  # Minimum threshold, values below this are ignored
         
         self.baseline_torques = None
         self.baseline_samples = []
-        self.baseline_sample_size = 30
+        self.baseline_sample_size = 20
         self.calibrating_baseline = True
         
         self.current_joint_angles = None
@@ -279,10 +280,10 @@ class WeightDetector(Node):
             self.calibration_factor = 0.0
         elif raw_mass < self.mass_threshold:
             # Use higher decay rate for lighter weights
-            self.calibration_factor = self.exp_amplitude * np.exp(-self.decay_light * raw_mass) / 2.4
+            self.calibration_factor = self.exp_amplitude * np.exp(-self.decay_light * raw_mass)
         else:
             # Use lower decay rate for heavier weights
-            self.calibration_factor = self.exp_amplitude * np.exp(-self.decay_heavy * raw_mass) / 0.83
+            self.calibration_factor = self.exp_amplitude * np.exp(-self.decay_heavy * raw_mass)
 
         self.estimated_mass_grams = raw_mass * self.calibration_factor * 1000
 
