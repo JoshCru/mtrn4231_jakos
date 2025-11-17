@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'system_dashboard = supervisor_module.system_dashboard:main',
+            'brain_dashboard = supervisor_module.brain_dashboard:main',
         ],
     },
 )
