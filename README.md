@@ -20,7 +20,7 @@ sudo apt install -y \
     ros-humble-rclcpp-lifecycle \
     ros-humble-rclcpp-action \
     libopencv-dev \
-    libpcl-dev \
+    libpcl-dev \    
     python3-numpy \
     python3-matplotlib
 ```
