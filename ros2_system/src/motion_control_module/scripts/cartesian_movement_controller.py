@@ -21,9 +21,45 @@ from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from shape_msgs.msg import SolidPrimitive
 from sensor_msgs.msg import JointState
 from sort_interfaces.srv import MoveToCartesian
-from tf_transformations import quaternion_from_euler
+from tf_transformations import quaternion_from_euler, quaternion_about_axis
 import numpy as np
 import math
+
+
+def rotation_vector_to_quaternion(rx, ry, rz):
+    """
+    Convert UR rotation vector (axis-angle) to quaternion.
+
+    The rotation vector represents the axis of rotation multiplied by
+    the angle of rotation in radians.
+
+    Args:
+        rx, ry, rz: Rotation vector components in radians
+
+    Returns:
+        Quaternion as [x, y, z, w]
+    """
+    # Calculate the angle (magnitude of rotation vector)
+    angle = math.sqrt(rx*rx + ry*ry + rz*rz)
+
+    if angle < 1e-10:
+        # No rotation, return identity quaternion
+        return [0.0, 0.0, 0.0, 1.0]
+
+    # Normalize to get axis
+    axis = [rx/angle, ry/angle, rz/angle]
+
+    # Convert axis-angle to quaternion
+    half_angle = angle / 2.0
+    sin_half = math.sin(half_angle)
+    cos_half = math.cos(half_angle)
+
+    qx = axis[0] * sin_half
+    qy = axis[1] * sin_half
+    qz = axis[2] * sin_half
+    qw = cos_half
+
+    return [qx, qy, qz, qw]
 
 
 class CartesianMovementController(Node):
@@ -87,19 +123,17 @@ class CartesianMovementController(Node):
             f'Received Cartesian request: x={request.x:.2f}, y={request.y:.2f}, '
             f'z={request.z:.2f} mm'
         )
+        self.get_logger().info(
+            f'Rotation vector: rx={request.rx:.4f}, ry={request.ry:.4f}, rz={request.rz:.4f} rad'
+        )
 
         # Convert mm to meters
         x_m = request.x / 1000.0
         y_m = request.y / 1000.0
         z_m = request.z / 1000.0
 
-        # Convert orientation degrees to radians
-        roll_rad = math.radians(request.roll)
-        pitch_rad = math.radians(request.pitch)
-        yaw_rad = math.radians(request.yaw)
-
-        # Create quaternion from RPY
-        quat = quaternion_from_euler(roll_rad, pitch_rad, yaw_rad)
+        # Convert UR rotation vector to quaternion
+        quat = rotation_vector_to_quaternion(request.rx, request.ry, request.rz)
 
         # Create target pose
         target_pose = PoseStamped()
@@ -117,7 +151,7 @@ class CartesianMovementController(Node):
             f'Target pose (meters): x={x_m:.4f}, y={y_m:.4f}, z={z_m:.4f}'
         )
         self.get_logger().info(
-            f'Orientation (deg): roll={request.roll:.2f}, pitch={request.pitch:.2f}, yaw={request.yaw:.2f}'
+            f'Quaternion: x={quat[0]:.4f}, y={quat[1]:.4f}, z={quat[2]:.4f}, w={quat[3]:.4f}'
         )
 
         # Plan and execute movement
