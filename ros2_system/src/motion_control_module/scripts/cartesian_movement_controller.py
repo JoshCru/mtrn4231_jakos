@@ -7,7 +7,8 @@ Controls UR5e robot using Cartesian coordinates with constrained wrist2 at -90 d
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
-from moveit_msgs.action import MoveGroup
+from moveit_msgs.action import MoveGroup, ExecuteTrajectory
+from moveit_msgs.srv import GetCartesianPath
 from moveit_msgs.msg import (
     Constraints,
     JointConstraint,
@@ -15,11 +16,13 @@ from moveit_msgs.msg import (
     OrientationConstraint,
     BoundingVolume,
     MotionPlanRequest,
-    PlanningOptions
+    PlanningOptions,
+    RobotState
 )
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
 from shape_msgs.msg import SolidPrimitive
 from sensor_msgs.msg import JointState
+from trajectory_msgs.msg import JointTrajectory
 from sort_interfaces.srv import MoveToCartesian
 from tf_transformations import quaternion_from_euler, quaternion_about_axis
 import numpy as np
@@ -66,8 +69,16 @@ class CartesianMovementController(Node):
     def __init__(self):
         super().__init__('cartesian_movement_controller')
 
-        # MoveGroup action client
-        self.move_group_client = ActionClient(self, MoveGroup, '/move_action')
+        # Cartesian path service client
+        self.cartesian_path_client = self.create_client(
+            GetCartesianPath,
+            '/compute_cartesian_path'
+        )
+
+        # ExecuteTrajectory action client
+        self.execute_trajectory_client = ActionClient(
+            self, ExecuteTrajectory, '/execute_trajectory'
+        )
 
         # Service for Cartesian movement
         self.cartesian_service = self.create_service(
@@ -105,13 +116,20 @@ class CartesianMovementController(Node):
 
         self.get_logger().info('Cartesian Movement Controller initialized')
         self.get_logger().info(f'Wrist2 constrained to: {math.degrees(self.wrist2_constraint):.2f} degrees')
+        self.get_logger().info('Using Cartesian path planning (straight-line motion)')
 
-        # Wait for action server
-        self.get_logger().info('Waiting for MoveGroup action server...')
-        if not self.move_group_client.wait_for_server(timeout_sec=10.0):
-            self.get_logger().error('MoveGroup action server not available')
+        # Wait for services/actions
+        self.get_logger().info('Waiting for /compute_cartesian_path service...')
+        if not self.cartesian_path_client.wait_for_service(timeout_sec=10.0):
+            self.get_logger().error('Cartesian path service not available')
         else:
-            self.get_logger().info('MoveGroup action server connected')
+            self.get_logger().info('Cartesian path service connected')
+
+        self.get_logger().info('Waiting for /execute_trajectory action server...')
+        if not self.execute_trajectory_client.wait_for_server(timeout_sec=10.0):
+            self.get_logger().error('ExecuteTrajectory action server not available')
+        else:
+            self.get_logger().info('ExecuteTrajectory action server connected')
 
     def joint_state_callback(self, msg):
         """Store current joint state"""
@@ -164,154 +182,155 @@ class CartesianMovementController(Node):
         return response
 
     def plan_and_execute(self, target_pose):
-        """Plan and execute movement to target pose with wrist2 constraint"""
+        """Plan and execute Cartesian path to target pose with wrist2 constraint"""
 
         if self.current_joint_state is None:
             return False, "No joint state available", []
 
-        # Create motion plan request
-        motion_plan_request = MotionPlanRequest()
-        motion_plan_request.group_name = self.group_name
-        motion_plan_request.num_planning_attempts = 10
-        motion_plan_request.allowed_planning_time = 5.0
-        motion_plan_request.max_velocity_scaling_factor = 0.3
-        motion_plan_request.max_acceleration_scaling_factor = 0.3
+        # Create GetCartesianPath request
+        request = GetCartesianPath.Request()
+        request.header.frame_id = self.planning_frame
+        request.header.stamp = self.get_clock().now().to_msg()
 
         # Set start state from current joint state
-        motion_plan_request.start_state.joint_state = self.current_joint_state
+        request.start_state.joint_state = self.current_joint_state
 
-        # Create pose goal constraint
-        goal_constraints = Constraints()
-        goal_constraints.name = "cartesian_goal"
+        # Group name
+        request.group_name = self.group_name
+        request.link_name = self.end_effector_link
 
-        # Position constraint
-        position_constraint = PositionConstraint()
-        position_constraint.header.frame_id = self.planning_frame
-        position_constraint.link_name = self.end_effector_link
-        position_constraint.target_point_offset.x = 0.0
-        position_constraint.target_point_offset.y = 0.0
-        position_constraint.target_point_offset.z = 0.0
+        # Add waypoints (just the target pose for straight-line motion)
+        request.waypoints = [target_pose.pose]
 
-        # Define tolerance region (small box around target)
-        primitive = SolidPrimitive()
-        primitive.type = SolidPrimitive.SPHERE
-        primitive.dimensions = [0.001]  # 1mm tolerance
+        # Cartesian path parameters
+        request.max_step = 0.01  # 1cm resolution for path interpolation
+        request.jump_threshold = 0.0  # Disable jump detection (0.0 = no check)
+        request.avoid_collisions = True
 
-        bounding_volume = BoundingVolume()
-        bounding_volume.primitives.append(primitive)
-        bounding_volume.primitive_poses.append(target_pose.pose)
-
-        position_constraint.constraint_region = bounding_volume
-        position_constraint.weight = 1.0
-        goal_constraints.position_constraints.append(position_constraint)
-
-        # Orientation constraint
-        orientation_constraint = OrientationConstraint()
-        orientation_constraint.header.frame_id = self.planning_frame
-        orientation_constraint.link_name = self.end_effector_link
-        orientation_constraint.orientation = target_pose.pose.orientation
-        orientation_constraint.absolute_x_axis_tolerance = 0.01
-        orientation_constraint.absolute_y_axis_tolerance = 0.01
-        orientation_constraint.absolute_z_axis_tolerance = 0.01
-        orientation_constraint.weight = 1.0
-        goal_constraints.orientation_constraints.append(orientation_constraint)
-
-        motion_plan_request.goal_constraints.append(goal_constraints)
-
-        # Add wrist2 path constraint to keep it at -90 degrees during motion
+        # Add wrist2 path constraint
         path_constraints = Constraints()
         path_constraints.name = "wrist2_constraint"
 
         wrist2_constraint = JointConstraint()
         wrist2_constraint.joint_name = 'wrist_2_joint'
         wrist2_constraint.position = self.wrist2_constraint
-        wrist2_constraint.tolerance_above = 0.05  # ~3 degrees tolerance
-        wrist2_constraint.tolerance_below = 0.05
+        wrist2_constraint.tolerance_above = 0.1  # ~6 degrees tolerance
+        wrist2_constraint.tolerance_below = 0.1
         wrist2_constraint.weight = 1.0
         path_constraints.joint_constraints.append(wrist2_constraint)
 
-        motion_plan_request.path_constraints = path_constraints
+        request.path_constraints = path_constraints
 
-        # Create MoveGroup goal
-        move_group_goal = MoveGroup.Goal()
-        move_group_goal.request = motion_plan_request
+        # Call Cartesian path service
+        self.get_logger().info('Computing Cartesian path with wrist2 constraint...')
+        future = self.cartesian_path_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future, timeout_sec=30.0)
 
-        planning_options = PlanningOptions()
-        planning_options.plan_only = False  # Plan and execute
-        planning_options.look_around = False
-        planning_options.replan = True
-        planning_options.replan_attempts = 3
-        move_group_goal.planning_options = planning_options
+        if future.result() is None:
+            return False, "Cartesian path service call failed", []
 
-        # Send goal
-        self.get_logger().info('Sending goal to MoveGroup with wrist2 constraint...')
-        send_goal_future = self.move_group_client.send_goal_async(move_group_goal)
+        response = future.result()
+
+        # Check fraction of path achieved
+        fraction = response.fraction
+        self.get_logger().info(f'Cartesian path computed: {fraction * 100:.1f}% of path achieved')
+
+        if fraction < 0.95:  # Require at least 95% of path
+            return False, f"Could only compute {fraction * 100:.1f}% of Cartesian path", []
+
+        if len(response.solution.joint_trajectory.points) == 0:
+            return False, "No trajectory points generated", []
+
+        # Apply velocity/acceleration scaling to trajectory
+        scaled_trajectory = self.scale_trajectory(
+            response.solution.joint_trajectory,
+            velocity_scale=0.3,
+            acceleration_scale=0.3
+        )
+
+        # Execute the trajectory
+        self.get_logger().info(f'Executing Cartesian path with {len(scaled_trajectory.points)} waypoints...')
+
+        execute_goal = ExecuteTrajectory.Goal()
+        execute_goal.trajectory.joint_trajectory = scaled_trajectory
+
+        send_goal_future = self.execute_trajectory_client.send_goal_async(execute_goal)
         rclpy.spin_until_future_complete(self, send_goal_future, timeout_sec=10.0)
 
         goal_handle = send_goal_future.result()
         if not goal_handle.accepted:
-            self.get_logger().error('Goal rejected by MoveGroup')
-            return False, "Goal rejected by MoveGroup", []
+            return False, "Trajectory execution rejected", []
 
-        self.get_logger().info('Goal accepted, waiting for result...')
+        self.get_logger().info('Trajectory accepted, executing...')
 
-        # Wait for result
         result_future = goal_handle.get_result_async()
-        rclpy.spin_until_future_complete(self, result_future, timeout_sec=60.0)
+        rclpy.spin_until_future_complete(self, result_future, timeout_sec=120.0)
 
         result = result_future.result()
-
         if result is None:
-            return False, "No result received", []
+            return False, "No execution result received", []
 
-        move_group_result = result.result
-
-        # Check error code
-        error_code = move_group_result.error_code.val
+        error_code = result.result.error_code.val
 
         if error_code == 1:  # SUCCESS
-            self.get_logger().info('Motion executed successfully!')
+            self.get_logger().info('Cartesian path executed successfully!')
 
-            # Extract final joint positions from planned trajectory
+            # Extract final joint positions
             joint_positions = []
-            if move_group_result.planned_trajectory.joint_trajectory.points:
-                final_point = move_group_result.planned_trajectory.joint_trajectory.points[-1]
+            if scaled_trajectory.points:
+                final_point = scaled_trajectory.points[-1]
                 joint_positions = list(final_point.positions)
 
                 self.get_logger().info('Final joint positions (radians):')
-                for i, name in enumerate(move_group_result.planned_trajectory.joint_trajectory.joint_names):
+                for i, name in enumerate(scaled_trajectory.joint_names):
                     if i < len(joint_positions):
                         self.get_logger().info(f'  {name}: {joint_positions[i]:.4f} ({math.degrees(joint_positions[i]):.2f} deg)')
 
-            return True, "Motion executed successfully", joint_positions
+            return True, "Cartesian path executed successfully", joint_positions
         else:
             error_messages = {
                 -1: "PLANNING_FAILED",
-                -2: "INVALID_MOTION_PLAN",
-                -3: "MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE",
                 -4: "CONTROL_FAILED",
-                -5: "UNABLE_TO_AQUIRE_SENSOR_DATA",
                 -6: "TIMED_OUT",
                 -7: "PREEMPTED",
-                -10: "START_STATE_IN_COLLISION",
-                -11: "START_STATE_VIOLATES_PATH_CONSTRAINTS",
-                -12: "GOAL_IN_COLLISION",
-                -13: "GOAL_VIOLATES_PATH_CONSTRAINTS",
-                -14: "GOAL_CONSTRAINTS_VIOLATED",
-                -15: "INVALID_GROUP_NAME",
-                -16: "INVALID_GOAL_CONSTRAINTS",
-                -17: "INVALID_ROBOT_STATE",
-                -18: "INVALID_LINK_NAME",
-                -19: "INVALID_OBJECT_NAME",
-                -21: "FRAME_TRANSFORM_FAILURE",
-                -22: "COLLISION_CHECKING_UNAVAILABLE",
-                -23: "ROBOT_STATE_STALE",
-                -24: "SENSOR_INFO_STALE",
-                -31: "NO_IK_SOLUTION",
             }
-            error_msg = error_messages.get(error_code, f"UNKNOWN_ERROR_{error_code}")
-            self.get_logger().error(f'Motion failed: {error_msg}')
-            return False, f"Motion failed: {error_msg}", []
+            error_msg = error_messages.get(error_code, f"EXECUTION_ERROR_{error_code}")
+            self.get_logger().error(f'Execution failed: {error_msg}')
+            return False, f"Execution failed: {error_msg}", []
+
+    def scale_trajectory(self, trajectory, velocity_scale=0.3, acceleration_scale=0.3):
+        """
+        Scale trajectory timing for velocity and acceleration limits.
+        """
+        from copy import deepcopy
+        from trajectory_msgs.msg import JointTrajectoryPoint
+        from builtin_interfaces.msg import Duration
+
+        scaled = deepcopy(trajectory)
+
+        if len(scaled.points) < 2:
+            return scaled
+
+        # Simple time scaling - multiply all times by 1/velocity_scale
+        time_scale = 1.0 / velocity_scale
+
+        for i, point in enumerate(scaled.points):
+            # Scale time from start
+            original_secs = point.time_from_start.sec + point.time_from_start.nanosec * 1e-9
+            new_secs = original_secs * time_scale
+
+            scaled.points[i].time_from_start.sec = int(new_secs)
+            scaled.points[i].time_from_start.nanosec = int((new_secs % 1) * 1e9)
+
+            # Scale velocities
+            if point.velocities:
+                scaled.points[i].velocities = [v * velocity_scale for v in point.velocities]
+
+            # Scale accelerations
+            if point.accelerations:
+                scaled.points[i].accelerations = [a * acceleration_scale for a in point.accelerations]
+
+        return scaled
 
 
 def main(args=None):
