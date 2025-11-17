@@ -1,0 +1,13 @@
+# Service to move robot to specified Cartesian position using IK
+# Coordinates in millimeters, wrist2 constrained to -90 degrees
+
+float64 x                    # X position in mm
+float64 y                    # Y position in mm
+float64 z                    # Z position in mm
+float64 roll                 # Roll orientation in degrees (default 0)
+float64 pitch                # Pitch orientation in degrees (default -180 for downward)
+float64 yaw                  # Yaw orientation in degrees (default 0)
+---
+bool success                 # True if movement was successful
+string message               # Status message or error description
+float64[] joint_positions    # Computed joint positions in radians

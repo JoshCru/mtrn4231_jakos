@@ -28,6 +28,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/CalibrateGripper.srv"
   "srv/GripperControl.srv"
   "srv/MoveToJointPosition.srv"
+  "srv/MoveToCartesian.srv"
   # Actions
   "action/PickObject.action"
   "action/PlaceObject.action"
