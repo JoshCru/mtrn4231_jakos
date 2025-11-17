@@ -10,4 +10,8 @@ gnome-terminal -t "MoveitServer" -- bash -c 'ros2 launch motion_control_module u
 
 sleep 5
 
-gnome-terminal -t "SafetyBoundaries" -- bash -c 'source ../ros2_system/install/setup.bash && python3 ../ros2_system/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_visualizer.py; exec bash'
+gnome-terminal -t "SafetyBoundaryVisuals" -- bash -c 'source ../ros2_system/install/setup.bash && python3 ../ros2_system/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_visualizer.py; exec bash'
+
+sleep 2
+
+gnome-terminal -t "SafetyBoundaryCollision" -- bash -c 'source ../ros2_system/install/setup.bash && python3 ../ros2_system/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_collision.py; exec bash'
