@@ -89,6 +89,17 @@ def generate_launch_description():
         ])
     )
 
+    # Weight detection module
+    weight_detection_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([
+                FindPackageShare('weight_detection_module'),
+                'launch',
+                'weight_detection.launch.py'
+            ])
+        ])
+    )
+
     # Optional: RViz for visualization
     rviz_node = Node(
         package='rviz2',
@@ -113,6 +124,7 @@ def generate_launch_description():
         planning_launch,
         control_launch,
         motion_control_launch,
+        weight_detection_launch,
 
         # Optional visualization
         # rviz_node,
