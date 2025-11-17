@@ -4,10 +4,10 @@ Master launch file for the complete sort-by-weight robot system
 Launches all modules with proper namespacing
 """
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, GroupAction, TimerAction, ExecuteProcess
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, GroupAction, TimerAction, ExecuteProcess, SetEnvironmentVariable
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
 
@@ -26,6 +26,16 @@ def generate_launch_description():
         description='Launch Brain Dashboard UI'
     )
 
+    log_level_arg = DeclareLaunchArgument(
+        'log_level',
+        default_value='info',
+        description='Logging level (debug, info, warn, error, fatal)',
+        choices=['debug', 'info', 'warn', 'error', 'fatal']
+    )
+
+    # Get log level configuration
+    log_level = LaunchConfiguration('log_level')
+
     # Brain Node - Central Orchestrator
     brain_node = Node(
         package='supervisor_module',
@@ -39,6 +49,7 @@ def generate_launch_description():
             'metrics_publish_rate': 0.2,
         }],
         emulate_tty=True,
+        arguments=['--ros-args', '--log-level', log_level],
     )
 
     # Supervisor module (System Controller)
@@ -49,7 +60,10 @@ def generate_launch_description():
                 'launch',
                 'supervisor.launch.py'
             ])
-        ])
+        ]),
+        launch_arguments={
+            'log_level': log_level
+        }.items()
     )
 
     # Perception module
@@ -62,7 +76,8 @@ def generate_launch_description():
             ])
         ]),
         launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time')
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'log_level': log_level
         }.items()
     )
 
@@ -74,7 +89,10 @@ def generate_launch_description():
                 'launch',
                 'recognition.launch.py'
             ])
-        ])
+        ]),
+        launch_arguments={
+            'log_level': log_level
+        }.items()
     )
 
     # Planning module
@@ -85,7 +103,10 @@ def generate_launch_description():
                 'launch',
                 'planning.launch.py'
             ])
-        ])
+        ]),
+        launch_arguments={
+            'log_level': log_level
+        }.items()
     )
 
     # Control module
@@ -96,7 +117,10 @@ def generate_launch_description():
                 'launch',
                 'control.launch.py'
             ])
-        ])
+        ]),
+        launch_arguments={
+            'log_level': log_level
+        }.items()
     )
 
     # Motion control module - REMOVED: gripper_controller_node moved to control_module
@@ -139,6 +163,7 @@ def generate_launch_description():
     return LaunchDescription([
         use_sim_time_arg,
         launch_dashboard_arg,
+        log_level_arg,
 
         # Brain Node - Central Orchestrator (launch first)
         brain_node,

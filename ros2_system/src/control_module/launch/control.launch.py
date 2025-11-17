@@ -24,6 +24,14 @@ def generate_launch_description():
         description='Path to control config file'
     )
 
+    log_level_arg = DeclareLaunchArgument(
+        'log_level',
+        default_value='info',
+        description='Logging level'
+    )
+
+    log_level = LaunchConfiguration('log_level')
+
     # Robot driver node (lifecycle)
     robot_driver_node = LifecycleNode(
         package='control_module',
@@ -32,6 +40,7 @@ def generate_launch_description():
         namespace='',
         output='screen',
         parameters=[LaunchConfiguration('config_file')],
+        arguments=['--ros-args', '--log-level', log_level],
         emulate_tty=True
     )
 
@@ -42,6 +51,7 @@ def generate_launch_description():
         name='pick_operation_node',
         output='screen',
         parameters=[LaunchConfiguration('config_file')],
+        arguments=['--ros-args', '--log-level', log_level],
         emulate_tty=True
     )
 
@@ -52,11 +62,13 @@ def generate_launch_description():
         name='place_operation_node',
         output='screen',
         parameters=[LaunchConfiguration('config_file')],
+        arguments=['--ros-args', '--log-level', log_level],
         emulate_tty=True
     )
 
     return LaunchDescription([
         config_file_arg,
+        log_level_arg,
         robot_driver_node,
         pick_operation_node,
         place_operation_node

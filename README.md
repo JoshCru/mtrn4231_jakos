@@ -104,6 +104,39 @@ ros2 launch control_module control.launch.py
 ros2 run motion_control_module joint_movement_controller
 ```
 
+### Controlling Log Output
+
+The system supports configurable logging levels to switch between debug and production modes.
+
+**Debug Mode** (verbose - see all messages):
+```bash
+ros2 launch launch/full_system.launch.py log_level:=debug
+```
+
+**Production Mode** (minimal - only warnings and errors):
+```bash
+ros2 launch launch/full_system.launch.py log_level:=warn
+```
+
+**Error Only** (silent except for errors):
+```bash
+ros2 launch launch/full_system.launch.py log_level:=error
+```
+
+**Available Log Levels:**
+- `debug` - Most verbose, shows everything including debug messages
+- `info` - Default level, shows informational messages
+- `warn` - Only warnings and errors
+- `error` - Only error messages
+- `fatal` - Only fatal errors
+
+**Alternative: Environment Variable**
+```bash
+# Suppress all INFO messages globally
+export RCUTILS_LOGGING_SEVERITY_THRESHOLD=WARNING
+ros2 launch launch/full_system.launch.py
+```
+
 ## Configuration
 
 Each module has a corresponding YAML configuration file in `<module>/config/`.
