@@ -59,12 +59,13 @@ def main():
     client = CartesianMovementClient()
 
     # Default home position values from user (UR rotation vector format)
-    home_x = 131.75
-    home_y = -589.21
-    home_z = -28.29
-    home_rx = 0.004
-    home_ry = 3.147
-    home_rz = 0.0
+    # With respect to BASE feature
+    home_x = -589.22
+    home_y = -131.78
+    home_z = 371.73
+    home_rx = 2.22
+    home_ry = 2.22
+    home_rz = 0.004
 
     if len(sys.argv) >= 4:
         # User provided coordinates
