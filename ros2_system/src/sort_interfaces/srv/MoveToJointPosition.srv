@@ -1,0 +1,9 @@
+# Service to move robot to specified joint positions
+# Joint order: [Joint6, Joint1, Joint2, Joint3, Joint4, Joint5]
+# Which maps to: [shoulder_pan, shoulder_lift, elbow, wrist_1, wrist_2, wrist_3]
+
+string position_name           # Name/description of the position (e.g., "home", "pick_up")
+float64[] joint_positions      # 6 joint positions in radians [J6, J1, J2, J3, J4, J5]
+---
+bool success                   # True if movement was successful
+string message                 # Status message or error description

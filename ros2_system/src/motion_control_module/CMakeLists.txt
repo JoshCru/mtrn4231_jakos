@@ -13,44 +13,39 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(moveit_msgs REQUIRED)
 find_package(sort_interfaces REQUIRED)
 
-# gripper_controller_node executable (lifecycle node)
-add_executable(gripper_controller_node src/gripper_controller_node.cpp)
-target_include_directories(gripper_controller_node PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-ament_target_dependencies(gripper_controller_node
+# joint_movement_controller executable (C++)
+add_executable(joint_movement_controller src/joint_movement_controller.cpp)
+ament_target_dependencies(joint_movement_controller
   rclcpp
-  rclcpp_lifecycle
+  rclcpp_action
   std_msgs
   sensor_msgs
+  geometry_msgs
+  moveit_msgs
   sort_interfaces
 )
 
-# gripper_button_interface executable
-add_executable(gripper_button_interface src/gripper_button_interface.cpp)
-ament_target_dependencies(gripper_button_interface
-  rclcpp
-  sort_interfaces
-)
-
-# Install targets
+# Install C++ targets
 install(TARGETS
-  gripper_controller_node
-  gripper_button_interface
+  joint_movement_controller
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# Install launch files, config, urdf, meshes, and scripts
+# Install launch files, config, urdf, scripts, srdf, and meshes
 install(DIRECTORY
   launch
   config
   urdf
-  meshes
   scripts
+  srdf
+  meshes
   DESTINATION share/${PROJECT_NAME}
 )
 
