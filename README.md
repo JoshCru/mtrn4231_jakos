@@ -8,4 +8,4 @@ Prereq: Ensure Servo in open position (align marker on the gear to 'o' position)
 **Commands:**
 - 'W' - open gripper
 - 'S' - close gripper
-- 'E \<angle\>' - edit close (grip) angle
+- 'E \<weight\>' - edit close (grip) angle
