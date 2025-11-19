@@ -1,0 +1,17 @@
+# Goal - coordinates and orientation
+# ALL COORDINATES ARE WITH RESPECT TO BASE_LINK FRAME (robot base)
+float64 x  # X position in mm (base_link frame)
+float64 y  # Y position in mm (base_link frame)
+float64 z  # Z position in mm (base_link frame)
+float64 rx # Rotation vector X component in radians (UR axis-angle format)
+float64 ry # Rotation vector Y component in radians (UR axis-angle format)
+float64 rz # Rotation vector Z component in radians (UR axis-angle format)
+---
+# Result
+bool success
+string message
+float64[] joint_positions
+---
+# Feedback
+string status
+float64 progress  # 0.0 to 1.0

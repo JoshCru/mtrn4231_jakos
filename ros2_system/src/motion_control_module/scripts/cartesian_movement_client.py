@@ -2,6 +2,10 @@
 """
 Cartesian Movement Client Example
 Demonstrates how to move the UR5e using Cartesian coordinates
+
+ALL COORDINATES ARE WITH RESPECT TO BASE_LINK FRAME (robot base)
+- X, Y, Z: Position in millimeters relative to robot base
+- RX, RY, RZ: Rotation vector in radians (UR axis-angle format)
 """
 
 import rclpy

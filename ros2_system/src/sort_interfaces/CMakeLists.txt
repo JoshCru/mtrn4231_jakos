@@ -34,6 +34,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/PlaceObject.action"
   "action/PlanTrajectory.action"
   "action/VerifyWeight.action"
+  "action/MoveToCartesian.action"
   DEPENDENCIES
     std_msgs
     geometry_msgs

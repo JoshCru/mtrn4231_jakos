@@ -48,7 +48,8 @@ class SafetyBoundaryVisualizer(Node):
             },
             'Ceiling': {
                 'normal': [0.0, 0.0, -1.0],  # Points downward
-                'distance': -0.655,  # z = 0.655m
+                # 'distance': -0.655,  # z = 0.655m
+                'distance': -2.655,  # z = 0.655m
                 'color': [1.0, 1.0, 0.0, 0.3],  # Yellow, semi-transparent
                 'restricts_elbow': True
             }

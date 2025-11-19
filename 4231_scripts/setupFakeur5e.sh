@@ -1,29 +1,24 @@
-
 #!/bin/bash
 
-# Get the directory where this script is located
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source ../ros2_system/install/setup.bash
 
-# Workspace paths (relative to project root)
-UR_DRIVER_WORKSPACE="$HOME/4231/ros_ur_driver/install/setup.bash"
-LOCAL_WORKSPACE="$PROJECT_ROOT/ros2_system/install/setup.bash"
-
-# Launch file paths (relative to script directory)
-UR_CONTROL_LAUNCH="$SCRIPT_DIR/ur_control_fixed.launch.py"
-UR_MOVEIT_LAUNCH="$SCRIPT_DIR/ur_moveit_fixed.launch.py"
-
-# Source both workspaces
-source "$UR_DRIVER_WORKSPACE"
-source "$LOCAL_WORKSPACE"
-
-gnome-terminal -t "DriverServer" -- bash -c "source '$UR_DRIVER_WORKSPACE' && source '$LOCAL_WORKSPACE' && ros2 launch '$UR_CONTROL_LAUNCH' ur_type:=ur5e robot_ip:=yyy.yyy.yyy.yyy initial_joint_controller:=joint_trajectory_controller use_fake_hardware:=true launch_rviz:=false description_file:=ur5e_with_end_effector.urdf.xacro description_package:=motion_control_module; exec bash"
+gnome-terminal -t "DriverServer" -- bash -c 'ros2 launch ur_robot_driver ur_control.launch.py ur_type:=ur5e robot_ip:=yyy.yyy.yyy.yyy initial_joint_controller:=joint_trajectory_controller use_fake_hardware:=true launch_rviz:=false description_file:=ur5e_with_end_effector.urdf.xacro description_package:=motion_control_module; exec bash'
 
 sleep 5
 
-gnome-terminal -t "MoveitServer" -- bash -c "source '$UR_DRIVER_WORKSPACE' && source '$LOCAL_WORKSPACE' && ros2 launch '$UR_MOVEIT_LAUNCH' ur_type:=ur5e launch_rviz:=true use_fake_hardware:=true description_file:=ur5e_with_end_effector.urdf.xacro description_package:=motion_control_module; exec bash"
+gnome-terminal -t "MoveitServer" -- bash -c 'ros2 launch motion_control_module ur5e_moveit_with_gripper.launch.py ur_type:=ur5e launch_rviz:=true use_fake_hardware:=true; exec bash'
 
+echo "Waiting for MoveIt to initialize..."
+sleep 5
 
+# Wait for robot_description_semantic parameter to be available
+echo "Waiting for robot_description_semantic parameter..."
+timeout 30 bash -c 'until ros2 param list /move_group 2>/dev/null | grep -q robot_description_semantic; do sleep 1; done' || echo "Warning: robot_description_semantic not found, continuing anyway..."
 
+sleep 2
 
+gnome-terminal -t "SafetyBoundaryVisuals" -- bash -c 'source ../ros2_system/install/setup.bash && python3 ../ros2_system/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_visualizer.py; exec bash'
 
+sleep 2
+
+gnome-terminal -t "SafetyBoundaryCollision" -- bash -c 'source ../ros2_system/install/setup.bash && python3 ../ros2_system/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_collision.py; exec bash'

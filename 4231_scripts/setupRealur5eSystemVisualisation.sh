@@ -8,7 +8,14 @@ sleep 10
 
 gnome-terminal -t "MoveitServer" -- bash -c 'ros2 launch motion_control_module ur5e_moveit_with_gripper.launch.py robot_ip:=192.168.0.100 ur_type:=ur5e launch_rviz:=true; exec bash'
 
+echo "Waiting for MoveIt to initialize..."
 sleep 5
+
+# Wait for robot_description_semantic parameter to be available
+echo "Waiting for robot_description_semantic parameter..."
+timeout 30 bash -c 'until ros2 param list /move_group 2>/dev/null | grep -q robot_description_semantic; do sleep 1; done' || echo "Warning: robot_description_semantic not found, continuing anyway..."
+
+sleep 2
 
 gnome-terminal -t "SafetyBoundaryVisuals" -- bash -c 'source ../ros2_system/install/setup.bash && python3 ../ros2_system/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_visualizer.py; exec bash'
 

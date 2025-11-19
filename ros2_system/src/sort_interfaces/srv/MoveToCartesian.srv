@@ -1,13 +1,13 @@
 # Service to move robot to specified Cartesian position using IK
-# Coordinates in millimeters, wrist2 constrained to -90 degrees
-# Orientation uses rotation vector (axis-angle) format as UR robots report
+# ALL COORDINATES ARE WITH RESPECT TO BASE_LINK FRAME (robot base)
+# Coordinates in millimeters, orientation uses rotation vector (axis-angle) format
 
-float64 x                    # X position in mm
-float64 y                    # Y position in mm
-float64 z                    # Z position in mm
-float64 rx                   # Rotation vector X component in radians
-float64 ry                   # Rotation vector Y component in radians
-float64 rz                   # Rotation vector Z component in radians
+float64 x                    # X position in mm (base_link frame)
+float64 y                    # Y position in mm (base_link frame)
+float64 z                    # Z position in mm (base_link frame)
+float64 rx                   # Rotation vector X component in radians (UR axis-angle format)
+float64 ry                   # Rotation vector Y component in radians (UR axis-angle format)
+float64 rz                   # Rotation vector Z component in radians (UR axis-angle format)
 ---
 bool success                 # True if movement was successful
 string message               # Status message or error description

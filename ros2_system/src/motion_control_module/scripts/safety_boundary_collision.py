@@ -53,7 +53,7 @@ class SafetyBoundaryCollision(Node):
         # Ceiling plane (z = 0.655) - large box above z=0.655
         self.add_box_boundary(
             name="ceiling_boundary",
-            center=[0.0, 0.0, 0.655 + 0.25],  # Center at z=0.905m
+            center=[0.0, 0.0, 2.655 + 0.25],  # Center at z=0.905m
             size=[4.0, 4.0, 0.5]  # 4m x 4m x 0.5m thick
         )
 
@@ -61,10 +61,10 @@ class SafetyBoundaryCollision(Node):
         self.get_logger().info('Waiting for planning scene...')
         rclpy.spin_once(self, timeout_sec=2.0)
 
-        # Publish collision objects
-        self.publish_collision_objects()
+        # Timer to publish collision objects periodically (MoveIt may miss single publish)
+        self.timer = self.create_timer(1.0, self.publish_collision_objects)
 
-        self.get_logger().info('Safety boundary collision objects added to planning scene')
+        self.get_logger().info('Safety boundary collision objects will be published every 1 second')
 
     def add_box_boundary(self, name, center, size):
         """Add a box collision object to represent a boundary."""

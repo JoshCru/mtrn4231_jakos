@@ -19,6 +19,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(sort_interfaces REQUIRED)
+find_package(moveit_ros_planning_interface REQUIRED)
 
 # joint_movement_controller executable (C++)
 add_executable(joint_movement_controller src/joint_movement_controller.cpp)
@@ -32,9 +33,19 @@ ament_target_dependencies(joint_movement_controller
   sort_interfaces
 )
 
+# safety_boundary_node executable (C++)
+add_executable(safety_boundary_node src/safety_boundary_node.cpp)
+ament_target_dependencies(safety_boundary_node
+  rclcpp
+  geometry_msgs
+  moveit_msgs
+  moveit_ros_planning_interface
+)
+
 # Install C++ targets
 install(TARGETS
   joint_movement_controller
+  safety_boundary_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
