@@ -4,6 +4,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Int32
+from std_srvs.srv import Trigger
 import numpy as np
 from collections import deque
 import matplotlib.pyplot as plt
@@ -124,8 +125,15 @@ class WeightDetector(Node):
         )
 
         self.weight_set = [20, 50, 100, 200, 500]
-        
+
         self.mass_publisher = self.create_publisher(Int32, '/estimated_mass', 10)
+
+        # Service to trigger baseline recalibration
+        self.calibration_service = self.create_service(
+            Trigger,
+            '/weight_detection/calibrate_baseline',
+            self.calibrate_baseline_callback
+        )
         
         self.num_joints = 6
         self.history_length = 100
@@ -209,7 +217,34 @@ class WeightDetector(Node):
     
     def update_parameters(self):
         self.active_joints = self.get_parameter('active_joints').value
-    
+
+    def calibrate_baseline_callback(self, request, response):
+        """Service callback to trigger baseline recalibration."""
+        self.get_logger().info("Baseline recalibration requested - resetting baseline...")
+
+        # Reset calibration state
+        self.baseline_torques = None
+        self.baseline_samples = []
+        self.calibrating_baseline = True
+
+        # Wait for calibration to complete (synchronous, will block until done)
+        # The calibration happens in joint_state_callback
+        timeout = 10.0  # seconds
+        start_time = self.get_clock().now()
+
+        while self.calibrating_baseline:
+            rclpy.spin_once(self, timeout_sec=0.1)
+            if (self.get_clock().now() - start_time).nanoseconds / 1e9 > timeout:
+                response.success = False
+                response.message = "Baseline calibration timed out"
+                self.get_logger().error(response.message)
+                return response
+
+        response.success = True
+        response.message = f"Baseline recalibrated successfully: {self.baseline_torques}"
+        self.get_logger().info(response.message)
+        return response
+
     def joint_state_callback(self, msg):
         joint_torques = msg.effort[:self.num_joints] if len(msg.effort) >= self.num_joints else msg.effort
         joint_positions = msg.position[:self.num_joints] if len(msg.position) >= self.num_joints else msg.position
