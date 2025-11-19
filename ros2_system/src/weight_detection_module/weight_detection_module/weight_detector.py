@@ -3,7 +3,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Int32
+from std_msgs.msg import Int32, Bool
 from std_srvs.srv import Trigger
 import numpy as np
 from collections import deque
@@ -128,6 +128,9 @@ class WeightDetector(Node):
 
         self.mass_publisher = self.create_publisher(Int32, '/estimated_mass', 10)
 
+        # Publish calibration status (True = calibrating, False = ready)
+        self.calibration_status_publisher = self.create_publisher(Bool, '/weight_detection/calibration_status', 10)
+
         # Service to trigger baseline recalibration
         self.calibration_service = self.create_service(
             Trigger,
@@ -153,7 +156,7 @@ class WeightDetector(Node):
         self.active_joints = [1, 2]    # Joints 2,3,4 are indices 1,2,3
         
         # Piecewise exponential calibration parameters
-        self.exp_amplitude = 7.0
+        self.exp_amplitude = 16.45
 
         # If running all packages simultaneously
         self.decay_light = 5.75  # For lighter weights
@@ -162,7 +165,7 @@ class WeightDetector(Node):
         # # If package running by itself:
         # self.decay_light = 6.15  # For lighter weights
         # self.decay_heavy = 3.35  # For heavier weights
-        self.mass_threshold = 0.05  # Threshold in kg, times by 5 for calibration
+        self.mass_threshold = 5  # Threshold in kg, times by 5 for calibration
         # e.g. mass_threshold = 0.05, 0.05 * 5 = 0.25kg
         self.min_threshold = 0.003  # Minimum threshold, values below this are ignored
         
@@ -219,7 +222,9 @@ class WeightDetector(Node):
         self.active_joints = self.get_parameter('active_joints').value
 
     def calibrate_baseline_callback(self, request, response):
-        """Service callback to trigger baseline recalibration."""
+        """Service callback to trigger baseline recalibration.
+        Returns immediately - calibration happens asynchronously via joint_state_callback.
+        Caller should wait ~1.5-2 seconds for 30 samples to be collected at typical rates."""
         self.get_logger().info("Baseline recalibration requested - resetting baseline...")
 
         # Reset calibration state
@@ -227,22 +232,14 @@ class WeightDetector(Node):
         self.baseline_samples = []
         self.calibrating_baseline = True
 
-        # Wait for calibration to complete (synchronous, will block until done)
-        # The calibration happens in joint_state_callback
-        timeout = 10.0  # seconds
-        start_time = self.get_clock().now()
+        # Publish calibration status
+        status_msg = Bool()
+        status_msg.data = True  # Calibrating
+        self.calibration_status_publisher.publish(status_msg)
 
-        while self.calibrating_baseline:
-            rclpy.spin_once(self, timeout_sec=0.1)
-            if (self.get_clock().now() - start_time).nanoseconds / 1e9 > timeout:
-                response.success = False
-                response.message = "Baseline calibration timed out"
-                self.get_logger().error(response.message)
-                return response
-
+        # Return immediately - calibration happens in joint_state_callback
         response.success = True
-        response.message = f"Baseline recalibrated successfully: {self.baseline_torques}"
-        self.get_logger().info(response.message)
+        response.message = "Baseline recalibration started. Wait ~1.5s for completion."
         return response
 
     def joint_state_callback(self, msg):
@@ -272,6 +269,12 @@ class WeightDetector(Node):
                 self.baseline_torques = np.median(self.baseline_samples, axis=0)
 
                 self.calibrating_baseline = False
+
+                # Publish calibration complete status
+                status_msg = Bool()
+                status_msg.data = False  # Not calibrating (ready)
+                self.calibration_status_publisher.publish(status_msg)
+
                 self.get_logger().info("Baseline calibration complete")
                 self.get_logger().info(f"Baseline torques for active joints: {self.baseline_torques}")
         else:
