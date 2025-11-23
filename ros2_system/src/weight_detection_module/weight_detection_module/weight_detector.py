@@ -171,7 +171,7 @@ class WeightDetector(Node):
         
         self.baseline_torques = None
         self.baseline_samples = []
-        self.baseline_sample_size = 30
+        self.baseline_sample_size = 5
         self.calibrating_baseline = True
         
         self.current_joint_angles = None
