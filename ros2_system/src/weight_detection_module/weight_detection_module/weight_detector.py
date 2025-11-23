@@ -156,7 +156,8 @@ class WeightDetector(Node):
         self.active_joints = [1, 2]    # Joints 2,3,4 are indices 1,2,3
         
         # Piecewise exponential calibration parameters
-        self.exp_amplitude = 16.45
+        self.exp_amplitude_light = 6.85   # For lighter weights
+        self.exp_amplitude_heavy = 16.45  # For heavier weights
 
         # If running all packages simultaneously
         self.decay_light = 5.75  # For lighter weights
@@ -165,9 +166,11 @@ class WeightDetector(Node):
         # # If package running by itself:
         # self.decay_light = 6.15  # For lighter weights
         # self.decay_heavy = 3.35  # For heavier weights
-        self.mass_threshold = 5  # Threshold in kg, times by 5 for calibration
-        # e.g. mass_threshold = 0.05, 0.05 * 5 = 0.25kg
-        self.min_threshold = 0.003  # Minimum threshold, values below this are ignored
+
+        # Threshold to swtich from decay_light -> decay_heavy
+        self.mass_threshold = 0.07  # Threshold in kg, times by 5 for calibration
+        # e.g. mass_threshold = 0.07, 0.07 * 5 = 0.35kg
+        self.min_threshold = 0.0035  # Minimum threshold, values below this are zero'd
         
         self.baseline_torques = None
         self.baseline_samples = []
@@ -317,10 +320,10 @@ class WeightDetector(Node):
             self.calibration_factor = 0.0
         elif raw_mass < self.mass_threshold:
             # Use higher decay rate for lighter weights
-            self.calibration_factor = self.exp_amplitude * np.exp(-self.decay_light * raw_mass) / 2.4
+            self.calibration_factor = self.exp_amplitude_light * np.exp(-self.decay_light * raw_mass)
         else:
             # Use lower decay rate for heavier weights
-            self.calibration_factor = self.exp_amplitude * np.exp(-self.decay_heavy * raw_mass) / 0.83
+            self.calibration_factor = self.exp_amplitude_heavy * np.exp(-self.decay_heavy * raw_mass)
 
         self.estimated_mass_grams = raw_mass * self.calibration_factor * 1000
 
