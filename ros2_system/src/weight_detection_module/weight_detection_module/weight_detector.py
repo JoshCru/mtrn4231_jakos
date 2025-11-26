@@ -4,7 +4,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Int32, Bool
-from std_srvs.srv import Trigger
+from sort_interfaces.srv import CalibrateBaseline
 import numpy as np
 from collections import deque
 import matplotlib.pyplot as plt
@@ -133,7 +133,7 @@ class WeightDetector(Node):
 
         # Service to trigger baseline recalibration
         self.calibration_service = self.create_service(
-            Trigger,
+            CalibrateBaseline,
             '/weight_detection/calibrate_baseline',
             self.calibrate_baseline_callback
         )
@@ -157,7 +157,7 @@ class WeightDetector(Node):
         
         # Piecewise exponential calibration parameters
         self.exp_amplitude_light = 6.85   # For lighter weights
-        self.exp_amplitude_heavy = 16.45  # For heavier weights
+        self.exp_amplitude_heavy = 7.69  # For heavier weights
 
         # If running all packages simultaneously
         self.decay_light = 5.75  # For lighter weights
@@ -167,14 +167,17 @@ class WeightDetector(Node):
         # self.decay_light = 6.15  # For lighter weights
         # self.decay_heavy = 3.35  # For heavier weights
 
-        # Threshold to swtich from decay_light -> decay_heavy
-        self.mass_threshold = 0.07  # Threshold in kg, times by 5 for calibration
-        # e.g. mass_threshold = 0.07, 0.07 * 5 = 0.35kg
-        self.min_threshold = 0.0035  # Minimum threshold, values below this are zero'd
+        # Threshold to switch from decay_light -> decay_heavy
+        self.mass_threshold = 0.25  # Threshold in kg, times by 5 for calibration
+        # e.g. mass_threshold = 0.05, 0.05 * 5 = 0.25kg
+        self.min_threshold = 0.0175  # Minimum threshold, values below this are zero'd
         
+        self.mass_threshold /= self.calibration_factor
+        self.min_threshold /= self.calibration_factor
+
         self.baseline_torques = None
         self.baseline_samples = []
-        self.baseline_sample_size = 5
+        self.baseline_sample_size = 10
         self.calibrating_baseline = True
         
         self.current_joint_angles = None
@@ -227,10 +230,9 @@ class WeightDetector(Node):
     def calibrate_baseline_callback(self, request, response):
         """Service callback to trigger baseline recalibration.
         Returns immediately - calibration happens asynchronously via joint_state_callback.
-        Caller should wait ~1.5-2 seconds for 30 samples to be collected at typical rates."""
+        Response includes wait_time_ms indicating how long caller should wait."""
         self.get_logger().info("Baseline recalibration requested - resetting baseline...")
 
-        # Reset calibration state
         self.baseline_torques = None
         self.baseline_samples = []
         self.calibrating_baseline = True
@@ -242,7 +244,8 @@ class WeightDetector(Node):
 
         # Return immediately - calibration happens in joint_state_callback
         response.success = True
-        response.message = "Baseline recalibration started. Wait ~1.5s for completion."
+        response.message = "Baseline recalibration started."
+        response.wait_time_ms = 550 * self.baseline_sample_size
         return response
 
     def joint_state_callback(self, msg):
