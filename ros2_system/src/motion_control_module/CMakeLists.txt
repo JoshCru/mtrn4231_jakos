@@ -17,8 +17,11 @@ find_package(rclcpp_action REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(trajectory_msgs REQUIRED)
+find_package(control_msgs REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(sort_interfaces REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 
 # joint_movement_controller executable (C++)
@@ -42,10 +45,26 @@ ament_target_dependencies(safety_boundary_node
   moveit_ros_planning_interface
 )
 
+# cartesian_controller_node executable (C++)
+add_executable(cartesian_controller_node src/cartesian_controller_node.cpp)
+ament_target_dependencies(cartesian_controller_node
+  rclcpp
+  rclcpp_action
+  std_msgs
+  std_srvs
+  sensor_msgs
+  geometry_msgs
+  trajectory_msgs
+  control_msgs
+  moveit_msgs
+  sort_interfaces
+)
+
 # Install C++ targets
 install(TARGETS
   joint_movement_controller
   safety_boundary_node
+  cartesian_controller_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
