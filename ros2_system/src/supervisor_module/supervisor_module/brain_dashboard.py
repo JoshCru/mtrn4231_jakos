@@ -11,7 +11,8 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QGroupBox, QPushButton, QLabel, QTextEdit, QTableWidget, QTableWidgetItem,
     QTabWidget, QGridLayout, QProgressBar, QFrame, QSplitter, QTreeWidget,
-    QTreeWidgetItem, QHeaderView, QStatusBar
+    QTreeWidgetItem, QHeaderView, QStatusBar, QLineEdit, QDoubleSpinBox,
+    QRadioButton, QButtonGroup
 )
 from PyQt5.QtCore import QTimer, Qt, pyqtSignal, QThread
 from PyQt5.QtGui import QColor, QFont, QPalette, QBrush
@@ -148,6 +149,9 @@ class BrainDashboard(QMainWindow):
 
         # Control tab
         tabs.addTab(self.create_control_tab(), "System Control")
+
+        # Motion Control tab
+        tabs.addTab(self.create_motion_control_tab(), "Motion Control")
 
         main_layout.addWidget(tabs)
 
@@ -411,7 +415,6 @@ class BrainDashboard(QMainWindow):
 
         # Command input
         commands_layout.addWidget(QLabel("Custom Command:"), 0, 0)
-        from PyQt5.QtWidgets import QLineEdit
         self.command_input = QLineEdit()
         self.command_input.setPlaceholderText("Enter command (e.g., get_nodes, get_topics)")
         commands_layout.addWidget(self.command_input, 0, 1, 1, 2)
@@ -453,6 +456,228 @@ class BrainDashboard(QMainWindow):
 
         layout.addStretch()
         return widget
+
+    def create_motion_control_tab(self):
+        """Create motion control tab for cartesian movements"""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+
+        # === Quick Actions ===
+        quick_group = QGroupBox("Quick Actions")
+        quick_layout = QHBoxLayout()
+
+        self.home_btn = QPushButton("GO HOME")
+        self.home_btn.setStyleSheet(
+            "QPushButton { background-color: #0066cc; color: white; padding: 20px 40px; "
+            "font-size: 18px; font-weight: bold; border-radius: 8px; }"
+            "QPushButton:hover { background-color: #0088ff; }"
+            "QPushButton:disabled { background-color: #444444; }")
+        self.home_btn.clicked.connect(self.send_go_home)
+        quick_layout.addWidget(self.home_btn)
+
+        quick_group.setLayout(quick_layout)
+        layout.addWidget(quick_group)
+
+        # === End-Effector Frame Selection ===
+        frame_group = QGroupBox("End-Effector Frame")
+        frame_layout = QHBoxLayout()
+
+        self.frame_button_group = QButtonGroup()
+
+        self.gripper_tip_radio = QRadioButton("Gripper Tip")
+        self.gripper_tip_radio.setChecked(True)
+        self.gripper_tip_radio.setStyleSheet("QRadioButton { font-size: 14px; color: #00ff00; }")
+        self.frame_button_group.addButton(self.gripper_tip_radio)
+        frame_layout.addWidget(self.gripper_tip_radio)
+
+        self.tool0_radio = QRadioButton("Tool0 (Robot TCP)")
+        self.tool0_radio.setStyleSheet("QRadioButton { font-size: 14px; color: #00aaff; }")
+        self.frame_button_group.addButton(self.tool0_radio)
+        frame_layout.addWidget(self.tool0_radio)
+
+        self.apply_frame_btn = QPushButton("Apply Frame")
+        self.apply_frame_btn.setStyleSheet(
+            "QPushButton { background-color: #666666; color: white; padding: 10px 20px; }"
+            "QPushButton:hover { background-color: #888888; }")
+        self.apply_frame_btn.clicked.connect(self.apply_frame_selection)
+        frame_layout.addWidget(self.apply_frame_btn)
+
+        frame_layout.addStretch()
+        frame_group.setLayout(frame_layout)
+        layout.addWidget(frame_group)
+
+        # === Cartesian Position Input ===
+        position_group = QGroupBox("Cartesian Position (mm / radians)")
+        position_layout = QGridLayout()
+
+        # Position labels and spinboxes
+        position_layout.addWidget(QLabel("X (mm):"), 0, 0)
+        self.x_spinbox = QDoubleSpinBox()
+        self.x_spinbox.setRange(-2000, 2000)
+        self.x_spinbox.setValue(-588)
+        self.x_spinbox.setDecimals(1)
+        self.x_spinbox.setSingleStep(10)
+        self.x_spinbox.setStyleSheet("QDoubleSpinBox { padding: 8px; font-size: 14px; }")
+        position_layout.addWidget(self.x_spinbox, 0, 1)
+
+        position_layout.addWidget(QLabel("Y (mm):"), 0, 2)
+        self.y_spinbox = QDoubleSpinBox()
+        self.y_spinbox.setRange(-2000, 2000)
+        self.y_spinbox.setValue(-133)
+        self.y_spinbox.setDecimals(1)
+        self.y_spinbox.setSingleStep(10)
+        self.y_spinbox.setStyleSheet("QDoubleSpinBox { padding: 8px; font-size: 14px; }")
+        position_layout.addWidget(self.y_spinbox, 0, 3)
+
+        position_layout.addWidget(QLabel("Z (mm):"), 0, 4)
+        self.z_spinbox = QDoubleSpinBox()
+        self.z_spinbox.setRange(0, 1000)
+        self.z_spinbox.setValue(222)
+        self.z_spinbox.setDecimals(1)
+        self.z_spinbox.setSingleStep(10)
+        self.z_spinbox.setStyleSheet("QDoubleSpinBox { padding: 8px; font-size: 14px; }")
+        position_layout.addWidget(self.z_spinbox, 0, 5)
+
+        # Rotation labels and spinboxes
+        position_layout.addWidget(QLabel("RX (rad):"), 1, 0)
+        self.rx_spinbox = QDoubleSpinBox()
+        self.rx_spinbox.setRange(-4, 4)
+        self.rx_spinbox.setValue(-2.221)
+        self.rx_spinbox.setDecimals(3)
+        self.rx_spinbox.setSingleStep(0.1)
+        self.rx_spinbox.setStyleSheet("QDoubleSpinBox { padding: 8px; font-size: 14px; }")
+        position_layout.addWidget(self.rx_spinbox, 1, 1)
+
+        position_layout.addWidget(QLabel("RY (rad):"), 1, 2)
+        self.ry_spinbox = QDoubleSpinBox()
+        self.ry_spinbox.setRange(-4, 4)
+        self.ry_spinbox.setValue(2.221)
+        self.ry_spinbox.setDecimals(3)
+        self.ry_spinbox.setSingleStep(0.1)
+        self.ry_spinbox.setStyleSheet("QDoubleSpinBox { padding: 8px; font-size: 14px; }")
+        position_layout.addWidget(self.ry_spinbox, 1, 3)
+
+        position_layout.addWidget(QLabel("RZ (rad):"), 1, 4)
+        self.rz_spinbox = QDoubleSpinBox()
+        self.rz_spinbox.setRange(-4, 4)
+        self.rz_spinbox.setValue(0.0)
+        self.rz_spinbox.setDecimals(3)
+        self.rz_spinbox.setSingleStep(0.1)
+        self.rz_spinbox.setStyleSheet("QDoubleSpinBox { padding: 8px; font-size: 14px; }")
+        position_layout.addWidget(self.rz_spinbox, 1, 5)
+
+        position_group.setLayout(position_layout)
+        layout.addWidget(position_group)
+
+        # === Move Button ===
+        move_layout = QHBoxLayout()
+
+        self.move_btn = QPushButton("MOVE TO POSITION")
+        self.move_btn.setStyleSheet(
+            "QPushButton { background-color: #00aa00; color: white; padding: 20px 60px; "
+            "font-size: 18px; font-weight: bold; border-radius: 8px; }"
+            "QPushButton:hover { background-color: #00cc00; }"
+            "QPushButton:disabled { background-color: #444444; }")
+        self.move_btn.clicked.connect(self.send_move_command)
+        move_layout.addWidget(self.move_btn)
+
+        self.stop_motion_btn = QPushButton("STOP")
+        self.stop_motion_btn.setStyleSheet(
+            "QPushButton { background-color: #ff0000; color: white; padding: 20px 40px; "
+            "font-size: 18px; font-weight: bold; border-radius: 8px; }"
+            "QPushButton:hover { background-color: #ff3333; }")
+        self.stop_motion_btn.clicked.connect(self.send_emergency_stop)
+        move_layout.addWidget(self.stop_motion_btn)
+
+        layout.addLayout(move_layout)
+
+        # === Preset Positions ===
+        presets_group = QGroupBox("Preset Positions")
+        presets_layout = QGridLayout()
+
+        preset_positions = [
+            ("Home", -588, -133, 222),
+            ("Above Home", -588, -133, 350),
+            ("Left", -700, -133, 222),
+            ("Right", -400, -133, 222),
+            ("Forward", -588, -250, 222),
+            ("Back", -588, -50, 222),
+        ]
+
+        for i, (name, x, y, z) in enumerate(preset_positions):
+            btn = QPushButton(name)
+            btn.setStyleSheet(
+                "QPushButton { background-color: #444444; color: white; padding: 10px 15px; }"
+                "QPushButton:hover { background-color: #666666; }")
+            btn.clicked.connect(lambda checked, x=x, y=y, z=z: self.set_preset_position(x, y, z))
+            presets_layout.addWidget(btn, i // 3, i % 3)
+
+        presets_group.setLayout(presets_layout)
+        layout.addWidget(presets_group)
+
+        # === Motion Status ===
+        status_group = QGroupBox("Motion Status")
+        status_layout = QVBoxLayout()
+
+        self.motion_status_text = QTextEdit()
+        self.motion_status_text.setReadOnly(True)
+        self.motion_status_text.setMaximumHeight(150)
+        self.motion_status_text.setStyleSheet(
+            "QTextEdit { background-color: #1e1e1e; color: #00ff00; font-family: monospace; }")
+        self.motion_status_text.setPlainText("Ready for motion commands...")
+        status_layout.addWidget(self.motion_status_text)
+
+        status_group.setLayout(status_layout)
+        layout.addWidget(status_group)
+
+        layout.addStretch()
+        return widget
+
+    # === Motion Control Methods ===
+
+    def send_go_home(self):
+        """Send go home command"""
+        self.motion_status_text.append("Sending GO HOME command...")
+        self.home_btn.setEnabled(False)
+        self.move_btn.setEnabled(False)
+        self.send_brain_command("go_home")
+        # Re-enable after delay
+        QTimer.singleShot(3000, lambda: self.home_btn.setEnabled(True))
+        QTimer.singleShot(3000, lambda: self.move_btn.setEnabled(True))
+
+    def apply_frame_selection(self):
+        """Apply the selected end-effector frame"""
+        if self.gripper_tip_radio.isChecked():
+            self.send_brain_command("use_gripper_tip")
+            self.motion_status_text.append("Switched to gripper_tip frame")
+        else:
+            self.send_brain_command("use_tool0")
+            self.motion_status_text.append("Switched to tool0 frame")
+
+    def send_move_command(self):
+        """Send move to cartesian position command"""
+        x = self.x_spinbox.value()
+        y = self.y_spinbox.value()
+        z = self.z_spinbox.value()
+        rx = self.rx_spinbox.value()
+        ry = self.ry_spinbox.value()
+        rz = self.rz_spinbox.value()
+
+        command = f"move {x} {y} {z} {rx} {ry} {rz}"
+        self.motion_status_text.append(f"Sending: {command}")
+        self.move_btn.setEnabled(False)
+        self.home_btn.setEnabled(False)
+        self.send_brain_command(command)
+        # Re-enable after delay
+        QTimer.singleShot(3000, lambda: self.move_btn.setEnabled(True))
+        QTimer.singleShot(3000, lambda: self.home_btn.setEnabled(True))
+
+    def set_preset_position(self, x, y, z):
+        """Set spinbox values to preset position"""
+        self.x_spinbox.setValue(x)
+        self.y_spinbox.setValue(y)
+        self.z_spinbox.setValue(z)
+        self.motion_status_text.append(f"Preset loaded: x={x}, y={y}, z={z}")
 
     # === Update Methods ===
 

@@ -20,6 +20,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(sort_interfaces REQUIRED)
+find_package(std_srvs REQUIRED)
 
 # Include directories
 include_directories(include)
@@ -37,6 +38,7 @@ add_executable(brain_node src/brain_node.cpp)
 ament_target_dependencies(brain_node
   rclcpp
   std_msgs
+  std_srvs
   sensor_msgs
   geometry_msgs
   sort_interfaces

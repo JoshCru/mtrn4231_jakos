@@ -20,6 +20,8 @@
 #include "sort_interfaces/msg/target_area.hpp"
 #include "sort_interfaces/srv/system_command.hpp"
 #include "sort_interfaces/srv/gripper_control.hpp"
+#include "sort_interfaces/srv/move_to_cartesian.hpp"
+#include <std_srvs/srv/set_bool.hpp>
 
 #include <string>
 #include <vector>
@@ -194,6 +196,21 @@ private:
     rclcpp::Client<sort_interfaces::srv::SystemCommand>::SharedPtr stop_client_;
     rclcpp::Client<sort_interfaces::srv::SystemCommand>::SharedPtr emergency_stop_client_;
     rclcpp::Client<sort_interfaces::srv::GripperControl>::SharedPtr gripper_control_client_;
+    rclcpp::Client<sort_interfaces::srv::MoveToCartesian>::SharedPtr move_cartesian_client_;
+    rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr toggle_frame_client_;
+
+    // Cartesian movement helpers
+    bool move_to_cartesian(double x, double y, double z, double rx, double ry, double rz, std::string& result_msg);
+    bool set_end_effector_frame(bool use_gripper_tip, std::string& result_msg);
+    bool move_to_home(std::string& result_msg);
+
+    // Home position (in input coordinates: negated x/y)
+    static constexpr double HOME_X = -588.0;
+    static constexpr double HOME_Y = -133.0;
+    static constexpr double HOME_Z = 222.0;
+    static constexpr double HOME_RX = -2.221;
+    static constexpr double HOME_RY = 2.221;
+    static constexpr double HOME_RZ = 0.0;
 
     // Service servers
     rclcpp::Service<sort_interfaces::srv::SystemCommand>::SharedPtr brain_command_service_;

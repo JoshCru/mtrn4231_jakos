@@ -128,6 +128,8 @@ void BrainNode::init_services()
     stop_client_ = this->create_client<sort_interfaces::srv::SystemCommand>("/system/stop");
     emergency_stop_client_ = this->create_client<sort_interfaces::srv::SystemCommand>("/system/emergency_stop");
     gripper_control_client_ = this->create_client<sort_interfaces::srv::GripperControl>("/motion_control/gripper_control");
+    move_cartesian_client_ = this->create_client<sort_interfaces::srv::MoveToCartesian>("/motion_control/move_to_cartesian");
+    toggle_frame_client_ = this->create_client<std_srvs::srv::SetBool>("/motion_control/use_gripper_tip");
 
     // Service servers
     brain_command_service_ = this->create_service<sort_interfaces::srv::SystemCommand>(
@@ -751,10 +753,69 @@ void BrainNode::handle_brain_command(
             response->success = true;
             response->message = ss.str();
         }
+        // === Cartesian Movement Commands ===
+        else if (command == "go_home" || command == "home")
+        {
+            std::string result_msg;
+            bool success = move_to_home(result_msg);
+            response->success = success;
+            response->message = result_msg;
+            if (success) {
+                log_event("Robot moved to home position", "MOTION");
+            }
+        }
+        else if (command == "use_gripper_tip")
+        {
+            std::string result_msg;
+            bool success = set_end_effector_frame(true, result_msg);
+            response->success = success;
+            response->message = result_msg;
+        }
+        else if (command == "use_tool0")
+        {
+            std::string result_msg;
+            bool success = set_end_effector_frame(false, result_msg);
+            response->success = success;
+            response->message = result_msg;
+        }
+        else if (command.rfind("move ", 0) == 0 || command.rfind("move_cartesian ", 0) == 0)
+        {
+            // Parse: move x y z rx ry rz  OR  move x y z (uses default rotation)
+            std::istringstream iss(request->command);  // Use original command (not lowercased)
+            std::string cmd_word;
+            double x, y, z, rx = HOME_RX, ry = HOME_RY, rz = HOME_RZ;
+
+            iss >> cmd_word >> x >> y >> z;
+            if (iss.fail()) {
+                response->success = false;
+                response->message = "Invalid move command. Usage: move x y z [rx ry rz]";
+            } else {
+                // Try to read optional rotation
+                double tmp_rx, tmp_ry, tmp_rz;
+                if (iss >> tmp_rx >> tmp_ry >> tmp_rz) {
+                    rx = tmp_rx;
+                    ry = tmp_ry;
+                    rz = tmp_rz;
+                }
+
+                std::string result_msg;
+                bool success = move_to_cartesian(x, y, z, rx, ry, rz, result_msg);
+                response->success = success;
+                response->message = result_msg;
+
+                if (success) {
+                    std::ostringstream event_ss;
+                    event_ss << "Moved to x=" << x << " y=" << y << " z=" << z;
+                    log_event(event_ss.str(), "MOTION");
+                }
+            }
+        }
         else
         {
             response->success = false;
-            response->message = "Unknown command: " + command;
+            response->message = "Unknown command: " + command +
+                "\nAvailable commands: start, stop, emergency_stop, reset, get_nodes, get_topics, "
+                "go_home, use_gripper_tip, use_tool0, move x y z [rx ry rz]";
         }
     }
     catch (const std::exception& e)
@@ -912,6 +973,84 @@ std::string BrainNode::get_system_metrics() const
     return ss.str();
 }
 
+// === Cartesian Movement Methods ===
+
+bool BrainNode::move_to_cartesian(double x, double y, double z, double rx, double ry, double rz, std::string& result_msg)
+{
+    if (!move_cartesian_client_->wait_for_service(std::chrono::seconds(2))) {
+        result_msg = "Cartesian controller service not available";
+        RCLCPP_ERROR(this->get_logger(), "%s", result_msg.c_str());
+        return false;
+    }
+
+    auto request = std::make_shared<sort_interfaces::srv::MoveToCartesian::Request>();
+    request->x = x;
+    request->y = y;
+    request->z = z;
+    request->rx = rx;
+    request->ry = ry;
+    request->rz = rz;
+
+    RCLCPP_INFO(this->get_logger(), "Moving to cartesian: x=%.1f y=%.1f z=%.1f rx=%.3f ry=%.3f rz=%.3f",
+                x, y, z, rx, ry, rz);
+
+    auto future = move_cartesian_client_->async_send_request(request);
+
+    // Wait for result with timeout
+    auto status = future.wait_for(std::chrono::seconds(120));
+    if (status != std::future_status::ready) {
+        result_msg = "Cartesian movement timed out";
+        RCLCPP_ERROR(this->get_logger(), "%s", result_msg.c_str());
+        return false;
+    }
+
+    auto response = future.get();
+    result_msg = response->message;
+
+    if (response->success) {
+        RCLCPP_INFO(this->get_logger(), "Cartesian movement completed: %s", result_msg.c_str());
+    } else {
+        RCLCPP_ERROR(this->get_logger(), "Cartesian movement failed: %s", result_msg.c_str());
+    }
+
+    return response->success;
+}
+
+bool BrainNode::set_end_effector_frame(bool use_gripper_tip, std::string& result_msg)
+{
+    if (!toggle_frame_client_->wait_for_service(std::chrono::seconds(2))) {
+        result_msg = "Frame toggle service not available";
+        RCLCPP_ERROR(this->get_logger(), "%s", result_msg.c_str());
+        return false;
+    }
+
+    auto request = std::make_shared<std_srvs::srv::SetBool::Request>();
+    request->data = use_gripper_tip;
+
+    auto future = toggle_frame_client_->async_send_request(request);
+
+    auto status = future.wait_for(std::chrono::seconds(5));
+    if (status != std::future_status::ready) {
+        result_msg = "Frame toggle timed out";
+        return false;
+    }
+
+    auto response = future.get();
+    result_msg = response->message;
+
+    std::string frame_name = use_gripper_tip ? "gripper_tip" : "tool0";
+    RCLCPP_INFO(this->get_logger(), "End-effector frame set to: %s", frame_name.c_str());
+    log_event("End-effector frame changed to: " + frame_name, "CONFIG");
+
+    return response->success;
+}
+
+bool BrainNode::move_to_home(std::string& result_msg)
+{
+    RCLCPP_INFO(this->get_logger(), "Moving to home position...");
+    return move_to_cartesian(HOME_X, HOME_Y, HOME_Z, HOME_RX, HOME_RY, HOME_RZ, result_msg);
+}
+
 }  // namespace supervisor_module
 
 int main(int argc, char** argv)
@@ -922,7 +1061,12 @@ int main(int argc, char** argv)
 
     RCLCPP_INFO(node->get_logger(), "Brain Node started - Central System Orchestrator");
 
-    rclcpp::spin(node);
+    // Use MultiThreadedExecutor to allow service callbacks to wait for other services
+    // without blocking the executor (prevents deadlock when calling cartesian controller)
+    rclcpp::executors::MultiThreadedExecutor executor;
+    executor.add_node(node);
+    executor.spin();
+
     rclcpp::shutdown();
     return 0;
 }
