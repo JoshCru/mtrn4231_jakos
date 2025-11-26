@@ -48,7 +48,8 @@ struct SafetyBounds {
     static constexpr double X_MAX = 2.0;
     static constexpr double Y_MIN = -0.7;  // Extended to allow y=-588mm
     static constexpr double Y_MAX = 2.0;
-    static constexpr double Z_MIN = 0.0;
+    static constexpr double Z_MIN_TOOL0 = 0.180;       // 180mm minimum for tool0 frame
+    static constexpr double Z_MIN_GRIPPER_TIP = 0.010; // 10mm minimum for gripper_tip frame
     static constexpr double Z_MAX = 0.655;
 };
 
@@ -210,12 +211,17 @@ private:
     }
 
     // Check if position is within safety boundaries (after negation to robot frame)
-    std::pair<bool, std::string> check_boundaries(double x_mm, double y_mm, double z_mm)
+    // use_gripper_tip: true = gripper_tip frame (Z_MIN=10mm), false = tool0 frame (Z_MIN=180mm)
+    std::pair<bool, std::string> check_boundaries(double x_mm, double y_mm, double z_mm, bool use_gripper_tip)
     {
         // Apply same negation as coordinate transform
         double x = -x_mm / 1000.0;
         double y = -y_mm / 1000.0;
         double z = z_mm / 1000.0;
+
+        // Select Z_MIN based on frame
+        double z_min = use_gripper_tip ? SafetyBounds::Z_MIN_GRIPPER_TIP : SafetyBounds::Z_MIN_TOOL0;
+        std::string frame_name = use_gripper_tip ? "gripper_tip" : "tool0";
 
         if (x < SafetyBounds::X_MIN) {
             return {false, "robot x=" + std::to_string(x * 1000) + "mm below minimum " +
@@ -233,9 +239,9 @@ private:
             return {false, "robot y=" + std::to_string(y * 1000) + "mm exceeds maximum " +
                            std::to_string(SafetyBounds::Y_MAX * 1000) + "mm"};
         }
-        if (z < SafetyBounds::Z_MIN) {
-            return {false, "robot z=" + std::to_string(z * 1000) + "mm below minimum " +
-                           std::to_string(SafetyBounds::Z_MIN * 1000) + "mm"};
+        if (z < z_min) {
+            return {false, frame_name + " z=" + std::to_string(z_mm) + "mm below minimum " +
+                           std::to_string(z_min * 1000) + "mm"};
         }
         if (z > SafetyBounds::Z_MAX) {
             return {false, "robot z=" + std::to_string(z * 1000) + "mm exceeds maximum " +
@@ -253,8 +259,8 @@ private:
             "Received move request: x=%.1f, y=%.1f, z=%.1f, rx=%.3f, ry=%.3f, rz=%.3f",
             request->x, request->y, request->z, request->rx, request->ry, request->rz);
 
-        // Check safety boundaries
-        auto [is_safe, safety_msg] = check_boundaries(request->x, request->y, request->z);
+        // Check safety boundaries (Z_MIN depends on frame: 180mm for tool0, 10mm for gripper_tip)
+        auto [is_safe, safety_msg] = check_boundaries(request->x, request->y, request->z, use_gripper_tip_);
         if (!is_safe) {
             RCLCPP_ERROR(this->get_logger(), "SAFETY VIOLATION: %s", safety_msg.c_str());
             response->success = false;
@@ -278,7 +284,8 @@ private:
         double x_m = -request->x / 1000.0;
         double y_m = -request->y / 1000.0;
         double z_m = request->z / 1000.0;
-        auto quat = rotation_vector_to_quaternion(request->rx, request->ry, request->rz);
+        // Negate ry to match coordinate frame transformation (x and y are also negated)
+        auto quat = rotation_vector_to_quaternion(request->rx, -request->ry, request->rz);
 
         RCLCPP_INFO(this->get_logger(), "Target (meters): x=%.4f, y=%.4f, z=%.4f", x_m, y_m, z_m);
 
