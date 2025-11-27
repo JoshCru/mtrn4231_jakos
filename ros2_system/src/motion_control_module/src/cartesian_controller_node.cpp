@@ -453,7 +453,7 @@ private:
 
     // Member variables
     bool use_fake_hardware_;
-    bool use_gripper_tip_ = true;  // true = gripper_tip, false = tool0
+    bool use_gripper_tip_ = false;  // true = gripper_tip, false = tool0 (default to tool0)
     std::string controller_name_;
     rclcpp::CallbackGroup::SharedPtr callback_group_;
 

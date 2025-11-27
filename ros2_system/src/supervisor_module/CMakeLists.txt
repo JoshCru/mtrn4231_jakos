@@ -1,77 +1,38 @@
 cmake_minimum_required(VERSION 3.8)
 project(supervisor_module)
 
-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
-
-# C++17 standard
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
-find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
-find_package(rclcpp_action REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(moveit_msgs REQUIRED)
-find_package(sort_interfaces REQUIRED)
-find_package(std_srvs REQUIRED)
-
-# Include directories
-include_directories(include)
-
-# system_controller_node executable (C++)
-add_executable(system_controller_node src/system_controller_node.cpp)
-ament_target_dependencies(system_controller_node
-  rclcpp
-  std_msgs
-  sort_interfaces
-)
-
-# brain_node executable (C++)
-add_executable(brain_node src/brain_node.cpp)
-ament_target_dependencies(brain_node
-  rclcpp
-  std_msgs
-  std_srvs
-  sensor_msgs
-  geometry_msgs
-  sort_interfaces
-)
-
-# Install C++ targets
-install(TARGETS
-  system_controller_node
-  brain_node
-  DESTINATION lib/${PROJECT_NAME}
-)
 
 # Install Python module
 ament_python_install_package(${PROJECT_NAME})
 
 # Install Python executables
 install(PROGRAMS
+  supervisor_module/sorting_brain_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME sorting_brain_node
+)
+
+install(PROGRAMS
+  supervisor_module/simulated_perception_node.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME simulated_perception_node
+)
+
+install(PROGRAMS
   supervisor_module/system_dashboard.py
   DESTINATION lib/${PROJECT_NAME}
   RENAME system_dashboard
 )
 
-install(PROGRAMS
-  supervisor_module/brain_dashboard.py
-  DESTINATION lib/${PROJECT_NAME}
-  RENAME brain_dashboard
-)
-
-# Install launch files and config
+# Install config
 install(DIRECTORY
-  launch
   config
   DESTINATION share/${PROJECT_NAME}
+  OPTIONAL
 )
 
 if(BUILD_TESTING)

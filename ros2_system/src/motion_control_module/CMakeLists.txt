@@ -24,27 +24,6 @@ find_package(sort_interfaces REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 
-# joint_movement_controller executable (C++)
-add_executable(joint_movement_controller src/joint_movement_controller.cpp)
-ament_target_dependencies(joint_movement_controller
-  rclcpp
-  rclcpp_action
-  std_msgs
-  sensor_msgs
-  geometry_msgs
-  moveit_msgs
-  sort_interfaces
-)
-
-# safety_boundary_node executable (C++)
-add_executable(safety_boundary_node src/safety_boundary_node.cpp)
-ament_target_dependencies(safety_boundary_node
-  rclcpp
-  geometry_msgs
-  moveit_msgs
-  moveit_ros_planning_interface
-)
-
 # cartesian_controller_node executable (C++)
 add_executable(cartesian_controller_node src/cartesian_controller_node.cpp)
 ament_target_dependencies(cartesian_controller_node
@@ -62,10 +41,15 @@ ament_target_dependencies(cartesian_controller_node
 
 # Install C++ targets
 install(TARGETS
-  joint_movement_controller
-  safety_boundary_node
   cartesian_controller_node
   DESTINATION lib/${PROJECT_NAME}
+)
+
+# Install Python scripts as executables
+install(PROGRAMS
+  scripts/go_home.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME go_home
 )
 
 # Install launch files, config, urdf, scripts, srdf, and meshes
