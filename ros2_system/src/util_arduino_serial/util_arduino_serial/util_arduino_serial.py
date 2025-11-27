@@ -7,7 +7,7 @@ class ArduinoNode(Node):
     def __init__(self):
         super().__init__('util_arduino_serial')
         self.subscription = self.create_subscription(String, 'arduinoCommand', self.command_callback, 10)
-        self.serial_port = serial.Serial('/dev/ttyACM0', 9600)  # Update the baud rate as required
+        self.serial_port = serial.Serial('/dev/ttyACM0', 115200)  # Updated to match gripper Arduino code
 
     def command_callback(self, msg):
         command = msg.data

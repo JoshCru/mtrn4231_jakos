@@ -17,8 +17,8 @@ from tkinter import ttk, scrolledtext
 from threading import Thread
 import datetime
 
-from std_msgs.msg import String
-from sort_interfaces.msg import WeightEstimate, BoundingBox
+from std_msgs.msg import String, Int32
+from sort_interfaces.msg import BoundingBox
 
 
 class SortingDashboard(Node):
@@ -38,7 +38,7 @@ class SortingDashboard(Node):
             String, '/sorting/status', self.status_callback, 10
         )
         self.weight_sub = self.create_subscription(
-            WeightEstimate, '/recognition/estimated_weights', self.weight_callback, 10
+            Int32, '/recognition/estimated_mass', self.weight_callback, 10
         )
 
         # State variables
@@ -46,6 +46,7 @@ class SortingDashboard(Node):
         self.sorted_weights = []
         self.current_weight = None
         self.last_status = ""
+        self.last_gripper_command = "---"
 
         self.get_logger().info("Sorting Dashboard initialized")
 
@@ -58,9 +59,26 @@ class SortingDashboard(Node):
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
         self.last_status = f"[{timestamp}] {msg.data}"
 
-    def weight_callback(self, msg: WeightEstimate):
+        # Extract gripper commands from status messages
+        if "gripper" in msg.data.lower() or "opening" in msg.data.lower() or "closing" in msg.data.lower():
+            if "Setting grip angle" in msg.data:
+                # Extract weight from message like "Setting grip angle for 100g..."
+                import re
+                match = re.search(r'(\d+)g', msg.data)
+                if match:
+                    self.last_gripper_command = f"E {match.group(1)}"
+            elif "Opening gripper" in msg.data:
+                self.last_gripper_command = "W (Open - 5s wait)"
+            elif "Closing gripper" in msg.data:
+                self.last_gripper_command = "S (Close - 5s wait)"
+            elif "opened" in msg.data.lower():
+                self.last_gripper_command = "W Complete"
+            elif "closed" in msg.data.lower():
+                self.last_gripper_command = "S Complete"
+
+    def weight_callback(self, msg: Int32):
         """Track measured weights."""
-        self.current_weight = msg.estimated_weight
+        self.current_weight = float(msg.data)
 
     def send_command(self, command: str):
         """Send command to sorting brain."""
@@ -134,6 +152,18 @@ class DashboardGUI:
             font=('Arial', 12)
         )
         self.weight_label.pack()
+
+        # Gripper Status
+        gripper_frame = ttk.LabelFrame(left_panel, text="Gripper Command", padding=10)
+        gripper_frame.pack(pady=5, fill=tk.X)
+
+        self.gripper_label = ttk.Label(
+            gripper_frame,
+            text="---",
+            font=('Arial', 11, 'bold'),
+            foreground='#FFA726'
+        )
+        self.gripper_label.pack()
 
         # Sorted Weights Display
         sorted_frame = ttk.LabelFrame(left_panel, text="Sorted Weights (Left → Right)", padding=10)
@@ -239,6 +269,9 @@ class DashboardGUI:
 
         # Update state
         self.state_label.config(text=self.node.current_state)
+
+        # Update gripper command
+        self.gripper_label.config(text=self.node.last_gripper_command)
 
         # Color code state
         state_colors = {

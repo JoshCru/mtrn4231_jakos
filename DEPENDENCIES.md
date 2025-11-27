@@ -169,18 +169,22 @@ These are automatically built when you run `colcon build`.
 - Object IDs
 - Coordinates in millimeters relative to base_link
 
-### Asad's Weight Calibration Module (recognition_module)
+### Asad's Weight Detection Module (weight_detection_module)
 
-**Required topic:** `/recognition/estimated_weights`
+**Published topic:** `/recognition/estimated_mass`
 
-**Message type:** `WeightEstimate`
+**Message type:** `Int32` (weight in grams)
 
-**Must provide:**
-- Weight in grams when triggered by `/perception/remove_object`
-- Object ID matching picked object
-- Confidence value
+**Values:** [0, 20, 50, 100, 200, 500]
 
-**Subscribes to:** `/perception/remove_object` (to know when to measure)
+**Description:**
+- Uses UR5e joint torques to estimate object mass
+- Includes Kalman filtering and physics-based estimation
+- Provides matplotlib visualization of torque data
+
+**Integration:**
+- The module is fully integrated and launched automatically in real robot mode
+- In simulation mode, `simulated_perception_node` publishes to the same topic with assumed perfect values
 
 ## Build Instructions
 

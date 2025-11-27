@@ -55,7 +55,7 @@ cat > /tmp/fastdds_profile.xml << 'EOF'
 </profiles>
 EOF
 
-echo "[1/7] Starting UR5e Driver (fake hardware)..."
+echo "[1/8] Starting UR5e Driver (fake hardware)..."
 ros2 launch ur_robot_driver ur_control.launch.py \
     ur_type:=ur5e \
     robot_ip:=yyy.yyy.yyy.yyy \
@@ -73,7 +73,7 @@ echo "   Waiting for UR driver to initialize..."
 sleep 8
 
 echo ""
-echo "[2/7] Starting MoveIt with RViz..."
+echo "[2/8] Starting MoveIt with RViz..."
 ros2 launch motion_control_module ur5e_moveit_with_gripper.launch.py \
     ur_type:=ur5e \
     launch_rviz:=true \
@@ -87,7 +87,7 @@ echo "   Waiting for MoveIt to initialize..."
 sleep 10
 
 echo ""
-echo "[3/7] Starting Visualizations..."
+echo "[3/8] Starting Visualizations..."
 echo "   - Safety Boundary Visualizer"
 python3 "${ROS2_WS}/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_collision.py" &
 SAFETY_PID=$!
@@ -103,12 +103,31 @@ echo "   Perception Node PID: $PERCEPTION_PID"
 sleep 3
 
 echo ""
-echo "[4/7] Moving robot to HOME position..."
+echo "[4/8] Moving robot to HOME position..."
 ros2 run motion_control_module go_home 5.0
 echo "   Robot at home position"
 
 echo ""
-echo "[5/7] Starting Cartesian Controller..."
+echo "[5/8] Starting Gripper Controller (simulation mode)..."
+ros2 run control_module gripper_controller_node --ros-args -p simulation_mode:=true &
+
+GRIPPER_PID=$!
+echo "   Gripper Controller PID: $GRIPPER_PID"
+
+sleep 2
+
+echo ""
+echo "   Activating gripper controller (lifecycle)..."
+ros2 lifecycle set /gripper_controller_node configure
+sleep 1
+ros2 lifecycle set /gripper_controller_node activate
+sleep 3
+echo "   Gripper controller ready"
+
+sleep 2
+
+echo ""
+echo "[6/8] Starting Cartesian Controller..."
 ros2 run motion_control_module cartesian_controller_node &
 
 CARTESIAN_PID=$!
@@ -117,7 +136,7 @@ echo "   Cartesian Controller PID: $CARTESIAN_PID"
 sleep 3
 
 echo ""
-echo "[6/7] Starting Sorting Brain Node..."
+echo "[7/8] Starting Sorting Brain Node..."
 ros2 run supervisor_module sorting_brain_node &
 
 SORTING_PID=$!
@@ -133,6 +152,7 @@ echo "  - UR Driver (fake):     PID $UR_PID"
 echo "  - MoveIt + RViz:        PID $MOVEIT_PID"
 echo "  - Safety Visualizer:    PID $SAFETY_PID"
 echo "  - Perception Node:      PID $PERCEPTION_PID"
+echo "  - Gripper Controller:   PID $GRIPPER_PID"
 echo "  - Cartesian Controller: PID $CARTESIAN_PID"
 echo "  - Sorting Brain:        PID $SORTING_PID"
 echo ""
@@ -148,6 +168,6 @@ wait -n
 
 # If one process exits, kill the others
 echo "A process exited, shutting down..."
-kill $UR_PID $MOVEIT_PID $CARTESIAN_PID $SAFETY_PID $PERCEPTION_PID $SORTING_PID 2>/dev/null || true
+kill $UR_PID $MOVEIT_PID $GRIPPER_PID $CARTESIAN_PID $SAFETY_PID $PERCEPTION_PID $SORTING_PID 2>/dev/null || true
 
 echo "Done."

@@ -16,7 +16,7 @@ from rclpy.node import Node
 from std_msgs.msg import Header, ColorRGBA, Int32
 from geometry_msgs.msg import Point
 from visualization_msgs.msg import Marker, MarkerArray
-from sort_interfaces.msg import DetectedObjects, BoundingBox, WeightEstimate
+from sort_interfaces.msg import DetectedObjects, BoundingBox
 import random
 import math
 
@@ -93,8 +93,8 @@ class SimulatedPerceptionNode(Node):
 
         # Publisher for weight estimates (when object is picked)
         self.weight_pub = self.create_publisher(
-            WeightEstimate,
-            '/recognition/estimated_weights',
+            Int32,
+            '/recognition/estimated_mass',
             10
         )
 
@@ -211,7 +211,7 @@ class SimulatedPerceptionNode(Node):
         obj.y_min = center_y - half_size
         obj.y_max = center_y + half_size
         obj.confidence = 0.95 + random.uniform(-0.05, 0.05)
-        obj.class_name = 'weight'
+        obj.class_name = f'{weight_grams}g'  # Include weight in class name for gripper control
 
         # Store the weight
         self.object_weights[obj.id] = float(weight_grams)
@@ -232,15 +232,9 @@ class SimulatedPerceptionNode(Node):
             weight = self.object_weights.get(msg.id, 100.0)
             self.get_logger().info(f'Removed object {msg.id} ({weight:.0f}g), {len(self.objects)} remaining')
 
-            # Publish the weight estimate for this object
-            weight_msg = WeightEstimate()
-            weight_msg.header = Header()
-            weight_msg.header.stamp = self.get_clock().now().to_msg()
-            weight_msg.header.frame_id = 'base_link'
-            weight_msg.object_id = msg.id
-            weight_msg.estimated_weight = weight
-            weight_msg.confidence = 0.99
-            weight_msg.volume = weight / 7.8  # Approximate for steel density
+            # Publish the weight estimate for this object (matching Asad's format)
+            weight_msg = Int32()
+            weight_msg.data = int(weight)
             self.weight_pub.publish(weight_msg)
             self.get_logger().info(f'Published weight estimate: {weight:.0f}g for object {msg.id}')
         else:

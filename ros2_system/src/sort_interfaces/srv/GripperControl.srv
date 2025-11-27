@@ -1,6 +1,10 @@
-# Service to control gripper open/close
-# command: "open" or "close" or "w" or "s"
+# Service to control gripper open/close/edit
+# command: "open" or "close" or "w" or "s" or "e 100" or "e 200" or "e 500"
+# weight: For edit command, specify target weight (100, 200, or 500)
+# wait_time_sec: Time to wait after command execution (default 5.0 for open/close)
 string command
+int32 weight  # Optional: 100, 200, or 500 for edit command
+float32 wait_time_sec  # Optional: wait time after command (default 5.0)
 ---
 bool success
 string message

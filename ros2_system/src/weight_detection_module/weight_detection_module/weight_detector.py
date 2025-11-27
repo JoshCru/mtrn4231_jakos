@@ -126,7 +126,7 @@ class WeightDetector(Node):
 
         self.weight_set = [20, 50, 100, 200, 500]
 
-        self.mass_publisher = self.create_publisher(Int32, '/estimated_mass', 10)
+        self.mass_publisher = self.create_publisher(Int32, '/recognition/estimated_mass', 10)
 
         # Publish calibration status (True = calibrating, False = ready)
         self.calibration_status_publisher = self.create_publisher(Bool, '/weight_detection/calibration_status', 10)

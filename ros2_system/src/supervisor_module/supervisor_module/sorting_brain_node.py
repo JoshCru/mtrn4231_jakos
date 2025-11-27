@@ -27,7 +27,7 @@ from typing import List, Optional, Tuple
 import time
 
 # Messages
-from std_msgs.msg import String, Float32, Header
+from std_msgs.msg import String, Float32, Int32, Header
 from geometry_msgs.msg import Pose
 from visualization_msgs.msg import Marker, MarkerArray
 from sort_interfaces.msg import DetectedObjects, WeightEstimate, BoundingBox
@@ -111,6 +111,7 @@ class SortingBrainNode(Node):
 
         # Current operation context
         self.current_object_id: Optional[int] = None
+        self.current_detected_object: Optional[BoundingBox] = None  # Full object with class_name
         self.current_weight: Optional[float] = None
         self.current_pick_position: Optional[Tuple[float, float]] = None
         self.detected_objects: List[BoundingBox] = []
@@ -118,6 +119,7 @@ class SortingBrainNode(Node):
         # Timeout tracking
         self.weight_wait_start: Optional[float] = None
         self.weight_timeout_sec = 10.0
+        self.weight_stabilization_sec = 7.0  # Time to wait at Z_DESCEND for weight sensor to stabilize
 
         # Track last known robot position (x, y in mm)
         # Start at a safe home position (center of picking area)
@@ -163,12 +165,20 @@ class SortingBrainNode(Node):
         self.move_client.wait_for_service(timeout_sec=30.0)
         self.get_logger().info('Move service ready')
 
-        # Check if gripper service is available (don't block if not)
-        self.gripper_available = self.gripper_client.wait_for_service(timeout_sec=2.0)
-        if self.gripper_available:
-            self.get_logger().info('Gripper service ready')
-        else:
-            self.get_logger().warn('Gripper service NOT available - gripper operations will be skipped')
+        # Check if gripper service is available with multiple retries
+        self.gripper_available = False
+        for attempt in range(3):
+            self.get_logger().info(f'Checking for gripper service (attempt {attempt+1}/3)...')
+            if self.gripper_client.wait_for_service(timeout_sec=5.0):
+                self.gripper_available = True
+                self.get_logger().info('Gripper service ready')
+                break
+            else:
+                self.get_logger().warn(f'Gripper service not found (attempt {attempt+1}/3)')
+                time.sleep(2.0)  # Wait 2 seconds before retry
+
+        if not self.gripper_available:
+            self.get_logger().warn('Gripper service NOT available after 3 attempts - gripper operations will be skipped')
 
     def _init_subscribers(self):
         """Initialize topic subscribers."""
@@ -190,10 +200,10 @@ class SortingBrainNode(Node):
             callback_group=self.callback_group
         )
 
-        # Weight estimation from Asad
+        # Weight estimation from Asad's weight_detection_module
         self.weight_estimate_sub = self.create_subscription(
-            WeightEstimate,
-            '/recognition/estimated_weights',
+            Int32,
+            '/recognition/estimated_mass',
             self.weight_estimate_callback,
             10,
             callback_group=self.callback_group
@@ -324,13 +334,11 @@ class SortingBrainNode(Node):
         if valid_objects and self.state == SortingState.WAITING_FOR_DETECTION:
             self.get_logger().info(f'Detected {len(valid_objects)} objects in picking area')
 
-    def weight_estimate_callback(self, msg: WeightEstimate):
-        """Handle weight estimate from perception/calibration node."""
-        # Accept weight if it matches current object (regardless of state, since timing can vary)
-        if msg.object_id == self.current_object_id or self.current_object_id is None:
-            self.current_weight = msg.estimated_weight
-            self.get_logger().info(f'Received weight estimate: {msg.estimated_weight:.1f}g '
-                                   f'for object {msg.object_id} (confidence: {msg.confidence:.2f})')
+    def weight_estimate_callback(self, msg: Int32):
+        """Handle weight estimate from Asad's weight_detection_module."""
+        # Accept weight (no object_id matching needed as weight detector measures what's held)
+        self.current_weight = float(msg.data)
+        self.get_logger().info(f'Received weight estimate: {msg.data}g')
 
     def force_feedback_callback(self, msg: Float32):
         """Fallback: use gripper force as weight estimate."""
@@ -398,6 +406,7 @@ class SortingBrainNode(Node):
             # Select the first available object
             obj = self.detected_objects[0]
             self.current_object_id = obj.id
+            self.current_detected_object = obj  # Store full object to access class_name
             self.current_pick_position = (
                 (obj.x_min + obj.x_max) / 2.0,
                 (obj.y_min + obj.y_max) / 2.0
@@ -424,32 +433,48 @@ class SortingBrainNode(Node):
         x, y = self.current_pick_position
 
         try:
-            # 1. Use staged movement to get to descend height above object
+            # Extract weight from object's class_name (e.g., "100g" -> 100)
+            grip_weight = self._extract_weight_from_class_name()
+            self.get_logger().info(f'=== PICKING from ({x:.1f}, {y:.1f}) - perceived weight: {grip_weight}g ===')
+
+            # 1. Set grip angle based on perceived weight (E <weight>)
+            msg = f'Step: Setting grip angle for {grip_weight}g...'
+            self.get_logger().info(msg)
+            self.publish_status(msg)
+            if not self.gripper_control('e', weight=grip_weight):
+                self.get_logger().error('Failed to set grip angle')
+                self.transition_state(SortingState.ERROR)
+                return
+
+            # 2. Open gripper and wait 5 seconds
+            msg = 'Step: Opening gripper (waiting 5s)...'
+            self.get_logger().info(msg)
+            self.publish_status(msg)
+            if not self.gripper_control('W', wait_time_sec=5.0):
+                self.get_logger().error('Failed to open gripper')
+                self.transition_state(SortingState.ERROR)
+                return
+
+            # 3. Use staged movement to get to descend height above object
             # This will: lift to Z_HOME -> move to x,y at Z_HOME -> descend to Z_DESCEND
-            self.get_logger().info(f'=== PICKING from ({x:.1f}, {y:.1f}) ===')
             self.get_logger().info(f'Step: Moving to approach position (staged)...')
             if not self.move_staged(x, y, self.Z_DESCEND):
                 self.get_logger().error('Failed to move to hover position')
                 self.transition_state(SortingState.ERROR)
                 return
 
-            # 2. Open gripper
-            self.get_logger().info('Step: Opening gripper...')
-            if not self.gripper_control('open'):
-                self.get_logger().error('Failed to open gripper')
-                self.transition_state(SortingState.ERROR)
-                return
-
-            # 3. Move down to pickup height (simple vertical move)
+            # 4. Move down to pickup height (simple vertical move)
             self.get_logger().info('Step: Descending to pickup height...')
             if not self.move_to(x, y, self.Z_PICKUP):
                 self.get_logger().error('Failed to move to pickup position')
                 self.transition_state(SortingState.ERROR)
                 return
 
-            # 4. Close gripper
-            self.get_logger().info('Step: Closing gripper...')
-            if not self.gripper_control('close'):
+            # 5. Close gripper and wait 5 seconds
+            msg = 'Step: Closing gripper (waiting 5s)...'
+            self.get_logger().info(msg)
+            self.publish_status(msg)
+            if not self.gripper_control('S', wait_time_sec=5.0):
                 self.get_logger().error('Failed to close gripper')
                 self.transition_state(SortingState.ERROR)
                 return
@@ -472,13 +497,19 @@ class SortingBrainNode(Node):
                 self.get_logger().info(f'Notified perception: removed object {self.current_object_id}')
 
             # 5. Lift to descend height (simple vertical move)
-            self.get_logger().info('Step: Lifting object...')
+            self.get_logger().info('Step: Lifting object to weighing height...')
             if not self.move_to(x, y, self.Z_DESCEND):
                 self.get_logger().error('Failed to lift object')
                 self.transition_state(SortingState.ERROR)
                 return
 
-            self.get_logger().info('=== PICK COMPLETE, waiting for weight... ===')
+            # 6. Wait at Z_DESCEND for weight sensor to stabilize and measure
+            msg = f'Step: Holding at weighing height for {self.weight_stabilization_sec:.1f}s (weight sensor stabilizing)...'
+            self.get_logger().info(msg)
+            self.publish_status(msg)
+            time.sleep(self.weight_stabilization_sec)
+
+            self.get_logger().info('=== PICK COMPLETE, waiting for weight measurement... ===')
             self.transition_state(SortingState.WEIGHING)
         finally:
             self.operation_in_progress = False
@@ -597,7 +628,7 @@ class SortingBrainNode(Node):
                 self.get_logger().error('Failed to move to staging position')
                 self.transition_state(SortingState.ERROR)
                 return
-            if not self.gripper_control('open'):
+            if not self.gripper_control('W', wait_time_sec=5.0):
                 self.get_logger().error('Failed to open gripper at staging')
                 self.transition_state(SortingState.ERROR)
                 return
@@ -626,7 +657,7 @@ class SortingBrainNode(Node):
                     continue
                 if not self.move_to(old_x, old_y, self.Z_PICKUP):
                     continue
-                if not self.gripper_control('close'):
+                if not self.gripper_control('S', wait_time_sec=5.0):
                     continue
                 self.holding_object = True
                 if not self.move_to(old_x, old_y, self.Z_DESCEND):
@@ -637,7 +668,7 @@ class SortingBrainNode(Node):
                     continue
                 if not self.move_to(new_x, new_y, self.Z_PLACE):
                     continue
-                if not self.gripper_control('open'):
+                if not self.gripper_control('W', wait_time_sec=5.0):
                     continue
                 self.holding_object = False
                 if not self.move_to(new_x, new_y, self.Z_DESCEND):
@@ -654,7 +685,7 @@ class SortingBrainNode(Node):
                 self.get_logger().error('Failed to descend to pickup at staging')
                 self.transition_state(SortingState.ERROR)
                 return
-            if not self.gripper_control('close'):
+            if not self.gripper_control('S', wait_time_sec=5.0):
                 self.get_logger().error('Failed to pick up staged weight')
                 self.transition_state(SortingState.ERROR)
                 return
@@ -705,9 +736,11 @@ class SortingBrainNode(Node):
                 self.transition_state(SortingState.ERROR)
                 return
 
-            # 3. Open gripper to release
-            self.get_logger().info('Step: Opening gripper to release...')
-            if not self.gripper_control('open'):
+            # 3. Open gripper to release and wait 5 seconds
+            msg = 'Step: Opening gripper to release (waiting 5s)...'
+            self.get_logger().info(msg)
+            self.publish_status(msg)
+            if not self.gripper_control('W', wait_time_sec=5.0):
                 self.get_logger().error('Failed to open gripper')
                 self.transition_state(SortingState.ERROR)
                 return
@@ -868,8 +901,38 @@ class SortingBrainNode(Node):
         self.get_logger().info('Staged move complete!')
         return True
 
-    def gripper_control(self, command: str) -> bool:
-        """Control gripper using gripper service."""
+    def _extract_weight_from_class_name(self) -> int:
+        """Extract weight from object's class_name (e.g., '100g' -> 100).
+
+        Returns:
+            Weight in grams (100, 200, or 500), defaults to 100 if not found
+        """
+        if self.current_detected_object and self.current_detected_object.class_name:
+            class_name = self.current_detected_object.class_name
+            try:
+                # Extract number from class_name (e.g., "100g" -> 100)
+                import re
+                match = re.search(r'(\d+)', class_name)
+                if match:
+                    weight = int(match.group(1))
+                    # Validate weight is one of the expected values
+                    if weight in [100, 200, 500]:
+                        return weight
+            except Exception as e:
+                self.get_logger().warning(f'Failed to parse weight from class_name "{class_name}": {e}')
+
+        # Default to 100g if parsing fails
+        self.get_logger().info('Using default grip weight: 100g')
+        return 100
+
+    def gripper_control(self, command: str, weight: int = 0, wait_time_sec: float = 0.0) -> bool:
+        """Control gripper using gripper service.
+
+        Args:
+            command: 'open', 'close', 'w', 's', 'e', or 'edit'
+            weight: For 'e' or 'edit' commands, specify weight (100, 200, or 500)
+            wait_time_sec: Time to wait after command (default 0.0, use 5.0 for open/close)
+        """
         # Skip service call if gripper service not available
         if not self.gripper_available:
             self.get_logger().info(f'Gripper {command}: SKIPPED (service not available)')
@@ -877,12 +940,15 @@ class SortingBrainNode(Node):
 
         request = GripperControl.Request()
         request.command = command
+        request.weight = weight
+        request.wait_time_sec = wait_time_sec
 
         try:
             future = self.gripper_client.call_async(request)
 
             # Wait for future without blocking the executor
-            timeout = 10.0
+            # Add extra timeout for wait_time_sec
+            timeout = 15.0 + wait_time_sec
             start = time.time()
             while not future.done():
                 if time.time() - start > timeout:

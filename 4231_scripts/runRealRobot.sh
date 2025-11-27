@@ -4,15 +4,14 @@
 #
 # Launches the sorting system with:
 # - REAL robot hardware
-# - REAL perception (Kevin's nodes)
-# - REAL weight estimation (Asad's calibration nodes)
+# - REAL perception (Kevin's nodes - must run separately)
+# - REAL weight detection (Asad's weight_detection_module - launched here)
 # - RViz visualization
 #
 # Use this for the final integrated system.
 #
 # PREREQUISITES:
 #   - Kevin's perception nodes must be running separately
-#   - Asad's weight calibration nodes must be running separately
 #   - Robot must be powered on and in remote control mode
 # =============================================================================
 
@@ -30,14 +29,13 @@ echo "==========================================="
 echo ""
 echo "Configuration:"
 echo "  Robot:      REAL ($ROBOT_IP)"
-echo "  Perception: REAL (Kevin's nodes)"
-echo "  Weights:    REAL (Asad's nodes)"
+echo "  Perception: REAL (Kevin's nodes - external)"
+echo "  Weights:    REAL (Asad's weight_detector - launched here)"
 echo ""
 echo "PREREQUISITES CHECK:"
 echo "  [ ] Robot powered on and in remote control mode"
 echo "  [ ] Robot at safe home position"
-echo "  [ ] Kevin's perception nodes running"
-echo "  [ ] Asad's weight calibration nodes running"
+echo "  [ ] Kevin's perception nodes running separately"
 echo "  [ ] Workspace clear of obstacles"
 echo ""
 read -p "All prerequisites met? Press Enter to continue or Ctrl+C to cancel..."
@@ -103,27 +101,52 @@ echo "   Waiting for MoveIt to initialize..."
 sleep 10
 
 echo ""
-echo "[3/6] Starting Visualizations..."
+echo "[3/8] Starting Visualizations..."
 echo "   - Safety Boundary Visualizer"
 python3 "${ROS2_WS}/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_collision.py" &
 SAFETY_PID=$!
 
 echo "   Safety Visualizer PID: $SAFETY_PID"
 echo ""
-echo "   NOTE: Expecting Kevin's perception and Asad's calibration nodes to be running!"
-echo "   Required topics:"
-echo "     - /perception/detected_objects (from Kevin)"
-echo "     - /recognition/estimated_weights (from Asad)"
+echo "   NOTE: Expecting Kevin's perception nodes to be running!"
+echo "   Required topic: /perception/detected_objects (from Kevin)"
 
 sleep 3
 
 echo ""
-echo "[4/6] Moving robot to HOME position..."
+echo "[4/8] Starting Weight Detection (Asad's module)..."
+ros2 run weight_detection_module weight_detector &
+WEIGHT_PID=$!
+echo "   Weight Detector PID: $WEIGHT_PID"
+
+sleep 2
+
+echo ""
+echo "[5/8] Moving robot to HOME position..."
 ros2 run motion_control_module go_home 5.0
 echo "   Robot at home position"
 
 echo ""
-echo "[5/6] Starting Cartesian Controller..."
+echo "[6/8] Starting Gripper Controller (real hardware)..."
+ros2 run control_module gripper_controller_node --ros-args -p simulation_mode:=false &
+
+GRIPPER_PID=$!
+echo "   Gripper Controller PID: $GRIPPER_PID"
+
+sleep 2
+
+echo ""
+echo "   Activating gripper controller (lifecycle)..."
+ros2 lifecycle set /gripper_controller_node configure
+sleep 1
+ros2 lifecycle set /gripper_controller_node activate
+sleep 3
+echo "   Gripper controller ready"
+
+sleep 2
+
+echo ""
+echo "[7/8] Starting Cartesian Controller..."
 ros2 run motion_control_module cartesian_controller_node &
 
 CARTESIAN_PID=$!
@@ -132,7 +155,7 @@ echo "   Cartesian Controller PID: $CARTESIAN_PID"
 sleep 3
 
 echo ""
-echo "[6/6] Starting Sorting Brain Node..."
+echo "[8/8] Starting Sorting Brain Node..."
 ros2 run supervisor_module sorting_brain_node &
 
 SORTING_PID=$!
@@ -147,12 +170,13 @@ echo "Running processes:"
 echo "  - UR Driver (REAL):     PID $UR_PID"
 echo "  - MoveIt + RViz:        PID $MOVEIT_PID"
 echo "  - Safety Visualizer:    PID $SAFETY_PID"
+echo "  - Weight Detector:      PID $WEIGHT_PID"
+echo "  - Gripper Controller:   PID $GRIPPER_PID"
 echo "  - Cartesian Controller: PID $CARTESIAN_PID"
 echo "  - Sorting Brain:        PID $SORTING_PID"
 echo ""
 echo "External dependencies (must be running):"
 echo "  - Kevin's perception nodes"
-echo "  - Asad's weight calibration nodes"
 echo ""
 echo "To control the system:"
 echo "  Open another terminal and run: ./launchDashboard.sh"
@@ -166,6 +190,6 @@ wait -n
 
 # If one process exits, kill the others
 echo "A process exited, shutting down..."
-kill $UR_PID $MOVEIT_PID $CARTESIAN_PID $SAFETY_PID $SORTING_PID 2>/dev/null || true
+kill $UR_PID $MOVEIT_PID $GRIPPER_PID $CARTESIAN_PID $SAFETY_PID $WEIGHT_PID $SORTING_PID 2>/dev/null || true
 
 echo "Done."
