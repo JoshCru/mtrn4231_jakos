@@ -3,7 +3,8 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Int32
+from std_msgs.msg import Int32, Bool
+from sort_interfaces.srv import CalibrateBaseline
 import numpy as np
 from collections import deque
 import matplotlib.pyplot as plt
@@ -124,8 +125,18 @@ class WeightDetector(Node):
         )
 
         self.weight_set = [20, 50, 100, 200, 500]
-        
+
         self.mass_publisher = self.create_publisher(Int32, '/estimated_mass', 10)
+
+        # Publish calibration status (True = calibrating, False = ready)
+        self.calibration_status_publisher = self.create_publisher(Bool, '/weight_detection/calibration_status', 10)
+
+        # Service to trigger baseline recalibration
+        self.calibration_service = self.create_service(
+            CalibrateBaseline,
+            '/weight_detection/calibrate_baseline',
+            self.calibrate_baseline_callback
+        )
         
         self.num_joints = 6
         self.history_length = 100
@@ -145,22 +156,29 @@ class WeightDetector(Node):
         self.active_joints = [1, 2]    # Joints 2,3,4 are indices 1,2,3
         
         # Piecewise exponential calibration parameters
-        self.exp_amplitude = 7.0
+            # If running all packages simultaneously
+        self.exp_amplitude_light = 5.15   # For lighter weights
+        self.exp_amplitude_heavy = 6.9  # For heavier weights
 
-        # If running all packages simultaneously
+            # If running only this package
+        # self.exp_amplitude_light = 6.85   # For lighter weights
+        # self.exp_amplitude_heavy = 7.69  # For heavier weights
+
         self.decay_light = 5.75  # For lighter weights
         self.decay_heavy = 2.95  # For heavier weights
-        
-        # # If package running by itself:
-        # self.decay_light = 6.15  # For lighter weights
-        # self.decay_heavy = 3.35  # For heavier weights
-        self.mass_threshold = 0.05  # Threshold in kg, times by 5 for calibration
+
+        # TODO: Cleanup this vvvv
+        # Threshold to switch from decay_light -> decay_heavy
+        self.mass_threshold = 0.3  # Threshold in kg, times by 5 for calibration
         # e.g. mass_threshold = 0.05, 0.05 * 5 = 0.25kg
-        self.min_threshold = 0.003  # Minimum threshold, values below this are ignored
+        self.min_threshold = 0.0175  # Minimum threshold, values below this are zero'd
         
+        self.mass_threshold /= self.calibration_factor
+        self.min_threshold /= self.calibration_factor
+
         self.baseline_torques = None
         self.baseline_samples = []
-        self.baseline_sample_size = 30
+        self.baseline_sample_size = 10
         self.calibrating_baseline = True
         
         self.current_joint_angles = None
@@ -209,7 +227,28 @@ class WeightDetector(Node):
     
     def update_parameters(self):
         self.active_joints = self.get_parameter('active_joints').value
-    
+
+    def calibrate_baseline_callback(self, request, response):
+        """Service callback to trigger baseline recalibration.
+        Returns immediately - calibration happens asynchronously via joint_state_callback.
+        Response includes wait_time_ms indicating how long caller should wait."""
+        self.get_logger().info("Baseline recalibration requested - resetting baseline...")
+
+        self.baseline_torques = None
+        self.baseline_samples = []
+        self.calibrating_baseline = True
+
+        # Publish calibration status
+        status_msg = Bool()
+        status_msg.data = True  # Calibrating
+        self.calibration_status_publisher.publish(status_msg)
+
+        # Return immediately - calibration happens in joint_state_callback
+        response.success = True
+        response.message = "Baseline recalibration started."
+        response.wait_time_ms = 550 * self.baseline_sample_size
+        return response
+
     def joint_state_callback(self, msg):
         joint_torques = msg.effort[:self.num_joints] if len(msg.effort) >= self.num_joints else msg.effort
         joint_positions = msg.position[:self.num_joints] if len(msg.position) >= self.num_joints else msg.position
@@ -237,6 +276,12 @@ class WeightDetector(Node):
                 self.baseline_torques = np.median(self.baseline_samples, axis=0)
 
                 self.calibrating_baseline = False
+
+                # Publish calibration complete status
+                status_msg = Bool()
+                status_msg.data = False  # Not calibrating (ready)
+                self.calibration_status_publisher.publish(status_msg)
+
                 self.get_logger().info("Baseline calibration complete")
                 self.get_logger().info(f"Baseline torques for active joints: {self.baseline_torques}")
         else:
@@ -279,10 +324,10 @@ class WeightDetector(Node):
             self.calibration_factor = 0.0
         elif raw_mass < self.mass_threshold:
             # Use higher decay rate for lighter weights
-            self.calibration_factor = self.exp_amplitude * np.exp(-self.decay_light * raw_mass) / 2.4
+            self.calibration_factor = self.exp_amplitude_light * np.exp(-self.decay_light * raw_mass)
         else:
             # Use lower decay rate for heavier weights
-            self.calibration_factor = self.exp_amplitude * np.exp(-self.decay_heavy * raw_mass) / 0.83
+            self.calibration_factor = self.exp_amplitude_heavy * np.exp(-self.decay_heavy * raw_mass)
 
         self.estimated_mass_grams = raw_mass * self.calibration_factor * 1000
 

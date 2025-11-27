@@ -100,6 +100,14 @@ def generate_launch_description():
         ])
     )
 
+    # Arduino serial communication node
+    arduino_serial_node = Node(
+        package='util_arduino_serial',
+        executable='util_arduino_serial',
+        name='util_arduino_serial',
+        output='screen'
+    )
+
     # Optional: RViz for visualization
     rviz_node = Node(
         package='rviz2',
@@ -125,6 +133,7 @@ def generate_launch_description():
         control_launch,
         motion_control_launch,
         weight_detection_launch,
+        arduino_serial_node,
 
         # Optional visualization
         # rviz_node,
