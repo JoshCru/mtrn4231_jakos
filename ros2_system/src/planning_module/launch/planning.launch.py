@@ -21,6 +21,14 @@ def generate_launch_description():
         description='Path to planning config file'
     )
 
+    log_level_arg = DeclareLaunchArgument(
+        'log_level',
+        default_value='info',
+        description='Logging level'
+    )
+
+    log_level = LaunchConfiguration('log_level')
+
     # Sort node
     sort_node = Node(
         package='planning_module',
@@ -28,6 +36,7 @@ def generate_launch_description():
         name='sort_node',
         output='screen',
         parameters=[LaunchConfiguration('config_file')],
+        arguments=['--ros-args', '--log-level', log_level],
         emulate_tty=True
     )
 
@@ -38,6 +47,7 @@ def generate_launch_description():
         name='verification_node',
         output='screen',
         parameters=[LaunchConfiguration('config_file')],
+        arguments=['--ros-args', '--log-level', log_level],
         emulate_tty=True
     )
 
@@ -48,6 +58,7 @@ def generate_launch_description():
         name='integrity_node',
         output='screen',
         parameters=[LaunchConfiguration('config_file')],
+        arguments=['--ros-args', '--log-level', log_level],
         emulate_tty=True
     )
 
@@ -58,11 +69,13 @@ def generate_launch_description():
         name='moveit2_interface_node',
         output='screen',
         parameters=[LaunchConfiguration('config_file')],
+        arguments=['--ros-args', '--log-level', log_level],
         emulate_tty=True
     )
 
     return LaunchDescription([
         config_file_arg,
+        log_level_arg,
         sort_node,
         verification_node,
         integrity_node,

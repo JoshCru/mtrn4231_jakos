@@ -4,10 +4,10 @@ Master launch file for the complete sort-by-weight robot system
 Launches all modules with proper namespacing
 """
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, GroupAction
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, GroupAction, TimerAction, ExecuteProcess, SetEnvironmentVariable
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
 
@@ -20,7 +20,39 @@ def generate_launch_description():
         description='Use simulation time'
     )
 
-    # Supervisor module
+    launch_dashboard_arg = DeclareLaunchArgument(
+        'launch_dashboard',
+        default_value='true',
+        description='Launch Brain Dashboard UI'
+    )
+
+    log_level_arg = DeclareLaunchArgument(
+        'log_level',
+        default_value='info',
+        description='Logging level (debug, info, warn, error, fatal)',
+        choices=['debug', 'info', 'warn', 'error', 'fatal']
+    )
+
+    # Get log level configuration
+    log_level = LaunchConfiguration('log_level')
+
+    # Brain Node - Central Orchestrator
+    brain_node = Node(
+        package='supervisor_module',
+        executable='brain_node',
+        name='brain_node',
+        output='screen',
+        parameters=[{
+            'discovery_rate': 0.5,
+            'health_check_rate': 1.0,
+            'status_publish_rate': 2.0,
+            'metrics_publish_rate': 0.2,
+        }],
+        emulate_tty=True,
+        arguments=['--ros-args', '--log-level', log_level],
+    )
+
+    # Supervisor module (System Controller)
     supervisor_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             PathJoinSubstitution([
@@ -28,7 +60,10 @@ def generate_launch_description():
                 'launch',
                 'supervisor.launch.py'
             ])
-        ])
+        ]),
+        launch_arguments={
+            'log_level': log_level
+        }.items()
     )
 
     # Perception module
@@ -41,7 +76,8 @@ def generate_launch_description():
             ])
         ]),
         launch_arguments={
-            'use_sim_time': LaunchConfiguration('use_sim_time')
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            'log_level': log_level
         }.items()
     )
 
@@ -53,7 +89,10 @@ def generate_launch_description():
                 'launch',
                 'recognition.launch.py'
             ])
-        ])
+        ]),
+        launch_arguments={
+            'log_level': log_level
+        }.items()
     )
 
     # Planning module
@@ -64,7 +103,10 @@ def generate_launch_description():
                 'launch',
                 'planning.launch.py'
             ])
-        ])
+        ]),
+        launch_arguments={
+            'log_level': log_level
+        }.items()
     )
 
     # Control module
@@ -75,19 +117,22 @@ def generate_launch_description():
                 'launch',
                 'control.launch.py'
             ])
-        ])
+        ]),
+        launch_arguments={
+            'log_level': log_level
+        }.items()
     )
 
-    # Motion control module
-    motion_control_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            PathJoinSubstitution([
-                FindPackageShare('motion_control_module'),
-                'launch',
-                'motion_control.launch.py'
-            ])
-        ])
-    )
+    # Motion control module - REMOVED: gripper_controller_node moved to control_module
+    # motion_control_launch = IncludeLaunchDescription(
+    #     PythonLaunchDescriptionSource([
+    #         PathJoinSubstitution([
+    #             FindPackageShare('motion_control_module'),
+    #             'launch',
+    #             'motion_control.launch.py'
+    #         ])
+    #     ])
+    # )
 
     # Weight detection module
     weight_detection_launch = IncludeLaunchDescription(
@@ -122,8 +167,25 @@ def generate_launch_description():
         condition=IfCondition('false')  # Disabled by default
     )
 
+    # Brain Dashboard (delayed launch to ensure nodes are up)
+    brain_dashboard = ExecuteProcess(
+        cmd=['ros2', 'run', 'supervisor_module', 'brain_dashboard'],
+        output='screen',
+        shell=False,
+    )
+
+    delayed_dashboard = TimerAction(
+        period=3.0,
+        actions=[brain_dashboard]
+    )
+
     return LaunchDescription([
         use_sim_time_arg,
+        launch_dashboard_arg,
+        log_level_arg,
+
+        # Brain Node - Central Orchestrator (launch first)
+        brain_node,
 
         # Launch all modules
         supervisor_launch,
@@ -134,6 +196,10 @@ def generate_launch_description():
         motion_control_launch,
         weight_detection_launch,
         arduino_serial_node,
+        # motion_control_launch,  # REMOVED: gripper_controller_node moved to control_module
+
+        # Brain Dashboard UI (delayed)
+        delayed_dashboard,
 
         # Optional visualization
         # rviz_node,

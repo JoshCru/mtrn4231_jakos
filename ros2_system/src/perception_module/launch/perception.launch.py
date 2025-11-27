@@ -27,6 +27,14 @@ def generate_launch_description():
         description='Use simulation time'
     )
 
+    log_level_arg = DeclareLaunchArgument(
+        'log_level',
+        default_value='info',
+        description='Logging level'
+    )
+
+    log_level = LaunchConfiguration('log_level')
+
     # RGBD Camera Node
     rgbd_camera_node = Node(
         package='perception_module',
@@ -37,6 +45,7 @@ def generate_launch_description():
             LaunchConfiguration('config_file'),
             {'use_sim_time': LaunchConfiguration('use_sim_time')}
         ],
+        arguments=['--ros-args', '--log-level', log_level],
         emulate_tty=True
     )
 
@@ -50,6 +59,7 @@ def generate_launch_description():
             LaunchConfiguration('config_file'),
             {'use_sim_time': LaunchConfiguration('use_sim_time')}
         ],
+        arguments=['--ros-args', '--log-level', log_level],
         emulate_tty=True
     )
 
@@ -63,12 +73,14 @@ def generate_launch_description():
             LaunchConfiguration('config_file'),
             {'use_sim_time': LaunchConfiguration('use_sim_time')}
         ],
+        arguments=['--ros-args', '--log-level', log_level],
         emulate_tty=True
     )
 
     return LaunchDescription([
         config_file_arg,
         use_sim_time_arg,
+        log_level_arg,
         rgbd_camera_node,
         opencv_processor_node,
         pointcloud_processor_node

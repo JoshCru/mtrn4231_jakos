@@ -21,6 +21,14 @@ def generate_launch_description():
         description='Path to recognition config file'
     )
 
+    log_level_arg = DeclareLaunchArgument(
+        'log_level',
+        default_value='info',
+        description='Logging level'
+    )
+
+    log_level = LaunchConfiguration('log_level')
+
     # Recognition node (for real camera)
     recognition_node = Node(
         package='recognition_module',
@@ -28,10 +36,12 @@ def generate_launch_description():
         name='recognition_node',
         output='screen',
         parameters=[LaunchConfiguration('config_file')],
+        arguments=['--ros-args', '--log-level', log_level],
         emulate_tty=True
     )
 
     return LaunchDescription([
         config_file_arg,
+        log_level_arg,
         recognition_node
     ])

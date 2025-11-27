@@ -21,6 +21,14 @@ def generate_launch_description():
         description='Path to system controller config file'
     )
 
+    log_level_arg = DeclareLaunchArgument(
+        'log_level',
+        default_value='info',
+        description='Logging level'
+    )
+
+    log_level = LaunchConfiguration('log_level')
+
     # System controller node
     system_controller_node = Node(
         package='supervisor_module',
@@ -28,10 +36,12 @@ def generate_launch_description():
         name='system_controller_node',
         output='screen',
         parameters=[LaunchConfiguration('config_file')],
+        arguments=['--ros-args', '--log-level', log_level],
         emulate_tty=True
     )
 
     return LaunchDescription([
         config_file_arg,
+        log_level_arg,
         system_controller_node
     ])

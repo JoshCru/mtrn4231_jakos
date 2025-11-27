@@ -1,0 +1,36 @@
+/**:
+  ros__parameters:
+    # Simulation mode - set to true for testing without hardware
+    simulation_mode: false
+
+    # Serial port configuration
+    # Linux: /dev/ttyACM0 or /dev/ttyUSB0
+    # macOS: /dev/cu.usbmodem* (e.g., /dev/cu.usbmodem141301)
+    serial_port: "/dev/ttyACM0"
+    baud_rate: 115200
+
+    # Publishing rate (Hz)
+    publish_rate: 20.0
+
+    # Hardware pins (for reference - configured on Teensy)
+    force_sensor_pin: "A0"
+    servo_pin: 9
+
+    # Servo limits
+    min_servo_angle: 0
+    max_servo_angle: 180
+
+    # Signal filtering
+    filter_window_size: 10
+
+    # Weight sensor calibration
+    # These values should be calibrated for your specific sensor
+    weight_calibration_factor: 1.0
+    zero_offset: 0.0
+
+    # Object detection threshold (grams)
+    # Weight above this threshold indicates an object is grasped
+    object_detection_threshold: 50.0
+
+    # Optional joystick control
+    enable_joystick_control: false
