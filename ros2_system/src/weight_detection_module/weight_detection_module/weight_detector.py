@@ -156,19 +156,20 @@ class WeightDetector(Node):
         self.active_joints = [1, 2]    # Joints 2,3,4 are indices 1,2,3
         
         # Piecewise exponential calibration parameters
-        self.exp_amplitude_light = 6.85   # For lighter weights
-        self.exp_amplitude_heavy = 7.69  # For heavier weights
+            # If running all packages simultaneously
+        self.exp_amplitude_light = 5.15   # For lighter weights
+        self.exp_amplitude_heavy = 6.85  # For heavier weights
 
-        # If running all packages simultaneously
+            # If running only this package
+        # self.exp_amplitude_light = 6.85   # For lighter weights
+        # self.exp_amplitude_heavy = 7.69  # For heavier weights
+
         self.decay_light = 5.75  # For lighter weights
         self.decay_heavy = 2.95  # For heavier weights
-        
-        # # If package running by itself:
-        # self.decay_light = 6.15  # For lighter weights
-        # self.decay_heavy = 3.35  # For heavier weights
 
+        # TODO: Cleanup this vvvv
         # Threshold to switch from decay_light -> decay_heavy
-        self.mass_threshold = 0.25  # Threshold in kg, times by 5 for calibration
+        self.mass_threshold = 0.35  # Threshold in kg, times by 5 for calibration
         # e.g. mass_threshold = 0.05, 0.05 * 5 = 0.25kg
         self.min_threshold = 0.0175  # Minimum threshold, values below this are zero'd
         
