@@ -28,6 +28,13 @@ install(PROGRAMS
   RENAME system_dashboard
 )
 
+# Install launch files
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}
+  OPTIONAL
+)
+
 # Install config
 install(DIRECTORY
   config

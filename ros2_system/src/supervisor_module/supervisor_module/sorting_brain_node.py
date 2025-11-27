@@ -388,9 +388,9 @@ class SortingBrainNode(Node):
             self.state_pub.publish(msg)
 
     def _handle_idle(self):
-        """IDLE state: wait for start command or auto-start if objects detected."""
-        # Auto-transition to waiting for detection
-        self.transition_state(SortingState.WAITING_FOR_DETECTION)
+        """IDLE state: wait for start command from dashboard."""
+        # Stay idle until commanded to start via dashboard
+        pass
 
     def _handle_waiting_for_detection(self):
         """Wait for objects to be detected in picking area."""
@@ -905,17 +905,22 @@ class SortingBrainNode(Node):
             self.get_logger().error(f'Gripper service call failed: {e}')
             return False
 
-    def publish_status(self):
+    def publish_status(self, message: str = None):
         """Publish current status."""
         msg = String()
-        status = {
-            'state': self.state.value,
-            'detected_objects': len(self.detected_objects),
-            'placed_weights': len(self.placed_weights),
-            'current_object_id': self.current_object_id,
-            'current_weight': self.current_weight
-        }
-        msg.data = str(status)
+        if message:
+            # Simple text message
+            msg.data = message
+        else:
+            # Detailed status dict
+            status = {
+                'state': self.state.value,
+                'detected_objects': len(self.detected_objects),
+                'placed_weights': len(self.placed_weights),
+                'current_object_id': self.current_object_id,
+                'current_weight': self.current_weight
+            }
+            msg.data = str(status)
         self.status_pub.publish(msg)
 
         # Also publish placed weight markers

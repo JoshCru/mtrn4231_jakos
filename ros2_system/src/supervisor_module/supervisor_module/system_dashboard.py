@@ -38,7 +38,7 @@ class SortingDashboard(Node):
             String, '/sorting/status', self.status_callback, 10
         )
         self.weight_sub = self.create_subscription(
-            WeightEstimate, '/perception/weight_estimate', self.weight_callback, 10
+            WeightEstimate, '/recognition/estimated_weights', self.weight_callback, 10
         )
 
         # State variables
@@ -160,7 +160,7 @@ class DashboardGUI:
         control_frame = ttk.LabelFrame(left_panel, text="Controls", padding=10)
         control_frame.pack(pady=5, fill=tk.X)
 
-        btn_style = {'width': 15, 'padding': 5}
+        btn_style = {'width': 15}
 
         self.start_btn = tk.Button(
             control_frame,
@@ -171,7 +171,7 @@ class DashboardGUI:
             command=self.start_sorting,
             **btn_style
         )
-        self.start_btn.pack(pady=2)
+        self.start_btn.pack(pady=5, padx=10)
 
         self.stop_btn = tk.Button(
             control_frame,
@@ -182,7 +182,7 @@ class DashboardGUI:
             command=self.stop_sorting,
             **btn_style
         )
-        self.stop_btn.pack(pady=2)
+        self.stop_btn.pack(pady=5, padx=10)
 
         self.reset_btn = tk.Button(
             control_frame,
@@ -193,7 +193,7 @@ class DashboardGUI:
             command=self.reset_system,
             **btn_style
         )
-        self.reset_btn.pack(pady=2)
+        self.reset_btn.pack(pady=5, padx=10)
 
         self.emergency_btn = tk.Button(
             control_frame,
@@ -204,7 +204,7 @@ class DashboardGUI:
             command=self.emergency_stop,
             **btn_style
         )
-        self.emergency_btn.pack(pady=2)
+        self.emergency_btn.pack(pady=5, padx=10)
 
         # Right panel - Status Log
         right_panel = ttk.Frame(content_frame)
