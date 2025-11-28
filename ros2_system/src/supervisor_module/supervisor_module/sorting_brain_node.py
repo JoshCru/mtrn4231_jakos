@@ -85,8 +85,8 @@ class SortingBrainNode(Node):
     RY = 2.221
     RZ = 0.0
 
-    # Spacing between placed weights (mm) - increased for larger weights
-    WEIGHT_SPACING = 60.0
+    # Gap between placed weights (mm) - edge to edge gap
+    WEIGHT_GAP = 15.0
 
     # Weight sizes based on mass (mm diameter)
     # 500g = 43mm, 200g = 32mm, 100g = 25mm
@@ -413,12 +413,52 @@ class SortingBrainNode(Node):
             )
             self.get_logger().info(f'Selected object {obj.id} at ({self.current_pick_position[0]:.1f}, '
                                    f'{self.current_pick_position[1]:.1f})')
+            # Reset the no-objects timer since we found one
+            if hasattr(self, '_no_objects_start_time'):
+                delattr(self, '_no_objects_start_time')
             self.transition_state(SortingState.PICKING)
+        elif self.placed_weights:
+            # No more objects to pick, but we have placed some weights
+            # Check if we should go home (wait a bit to make sure no new objects appear)
+            if not hasattr(self, '_no_objects_start_time'):
+                self._no_objects_start_time = time.time()
+            elif time.time() - self._no_objects_start_time > 3.0:
+                # No objects for 3 seconds, sorting complete - return home
+                self.get_logger().info('=== SORTING COMPLETE! Returning to home position... ===')
+                self.publish_status('Sorting complete! Returning home...')
+                self._return_home_and_finish()
 
     def _handle_moving_to_home(self):
         """Move robot to home position."""
         # This is called when we need to return home between operations
         self.transition_state(SortingState.WAITING_FOR_DETECTION)
+
+    def _return_home_and_finish(self):
+        """Return robot to home position and finish sorting."""
+        self.operation_in_progress = True
+
+        try:
+            # Move to home position (center of picking area, at safe height)
+            home_x = -600.0
+            home_y = -100.0
+
+            self.get_logger().info(f'Moving to home position ({home_x:.1f}, {home_y:.1f}, {self.Z_HOME:.1f})...')
+            self.move_staged(home_x, home_y, self.Z_HOME)
+
+            # Print final sorted order
+            weights_str = ', '.join([f'{pw.weight_grams:.0f}g' for pw in self.placed_weights])
+            self.get_logger().info(f'=== FINAL SORTED ORDER: [{weights_str}] ===')
+            self.publish_status(f'Sorting complete! Final order: [{weights_str}]')
+
+            # Transition to IDLE
+            self.transition_state(SortingState.IDLE)
+
+            # Reset the timer
+            if hasattr(self, '_no_objects_start_time'):
+                delattr(self, '_no_objects_start_time')
+
+        finally:
+            self.operation_in_progress = False
 
     def _handle_picking(self):
         """Execute pick sequence using staged movements."""
@@ -582,13 +622,44 @@ class SortingBrainNode(Node):
             self.transition_state(SortingState.PLACING)
 
     def calculate_placement_position_simple(self, index: int) -> Tuple[float, float]:
-        """Calculate X,Y position for a weight at the given index (left-to-right, no centering)."""
+        """Calculate X,Y position for a weight at the given index (left-to-right, edge-to-edge spacing)."""
         # Start from left side of placing area with some margin
-        start_x = self.PLACING_AREA['x_min'] + 50.0
         center_y = (self.PLACING_AREA['y_min'] + self.PLACING_AREA['y_max']) / 2.0
 
-        # Simple left-to-right positioning
-        x = start_x + (index * self.WEIGHT_SPACING)
+        # Calculate x position based on edge-to-edge spacing
+        # We need to account for the radii of all weights before this one
+        # Start position: left edge + margin + radius of first weight
+        margin = 30.0  # margin from edge of placing area
+
+        if index == 0:
+            # First weight: place at margin + its own radius from left edge
+            # Use default size for estimation (will be corrected when we know the weight)
+            first_weight_radius = self.WEIGHT_SIZES[100] / 2.0  # Default to smallest
+            x = self.PLACING_AREA['x_min'] + margin + first_weight_radius
+        else:
+            # Calculate position based on all placed weights before this one
+            x = self.PLACING_AREA['x_min'] + margin
+
+            # Sum up the diameters and gaps of all placed weights
+            for i, pw in enumerate(self.placed_weights[:index]):
+                size = self.get_weight_size(pw.weight_grams)
+                if i == 0:
+                    x += size / 2.0  # First weight: add radius
+                else:
+                    x += size / 2.0  # Add radius of this weight
+
+                x += self.WEIGHT_GAP  # Add gap after each weight
+                x += size / 2.0  # Add radius for next weight's center
+
+            # If we're inserting (not all weights exist yet), estimate for new weight
+            if index >= len(self.placed_weights):
+                # Adding at end, add radius of current weight (estimate)
+                if self.current_weight:
+                    new_size = self.get_weight_size(self.current_weight)
+                    x += new_size / 2.0
+                else:
+                    x += self.WEIGHT_SIZES[100] / 2.0  # Default
+
         y = center_y
 
         return x, y
