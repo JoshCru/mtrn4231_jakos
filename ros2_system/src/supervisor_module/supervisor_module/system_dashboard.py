@@ -100,7 +100,11 @@ class DashboardGUI:
 
         # Configure style
         self.style = ttk.Style()
-        self.style.theme_use('clam')
+        try:
+            self.style.theme_use('clam')
+        except tk.TclError:
+            # Fallback if 'clam' theme not available
+            pass
         self.style.configure('TLabel', background='#2b2b2b', foreground='#ffffff', font=('Arial', 10))
         self.style.configure('Title.TLabel', font=('Arial', 16, 'bold'))
         self.style.configure('State.TLabel', font=('Arial', 14, 'bold'), foreground='#4CAF50')
@@ -118,7 +122,7 @@ class DashboardGUI:
 
         title = ttk.Label(
             title_frame,
-            text="🤖 UR5e Weight Sorting System",
+            text="UR5e Weight Sorting System",
             style='Title.TLabel'
         )
         title.pack()
@@ -194,7 +198,7 @@ class DashboardGUI:
 
         self.start_btn = tk.Button(
             control_frame,
-            text="▶ Start",
+            text="[>] Start",
             bg='#4CAF50',
             fg='white',
             font=('Arial', 10, 'bold'),
@@ -205,7 +209,7 @@ class DashboardGUI:
 
         self.stop_btn = tk.Button(
             control_frame,
-            text="⏸ Stop",
+            text="[||] Stop",
             bg='#FF9800',
             fg='white',
             font=('Arial', 10, 'bold'),
@@ -216,7 +220,7 @@ class DashboardGUI:
 
         self.reset_btn = tk.Button(
             control_frame,
-            text="🔄 Reset",
+            text="[R] Reset",
             bg='#2196F3',
             fg='white',
             font=('Arial', 10, 'bold'),
@@ -227,7 +231,7 @@ class DashboardGUI:
 
         self.emergency_btn = tk.Button(
             control_frame,
-            text="⚠ Emergency Stop",
+            text="[!] Emergency Stop",
             bg='#F44336',
             fg='white',
             font=('Arial', 10, 'bold'),
@@ -259,7 +263,7 @@ class DashboardGUI:
 
         self.connection_label = ttk.Label(
             footer_frame,
-            text="🟢 Connected to ROS2",
+            text="[OK] Connected to ROS2",
             font=('Arial', 9)
         )
         self.connection_label.pack()
@@ -311,22 +315,22 @@ class DashboardGUI:
     def start_sorting(self):
         """Send start command."""
         self.node.send_command("start")
-        self.log_message("▶ START command sent")
+        self.log_message("[>] START command sent")
 
     def stop_sorting(self):
         """Send stop command."""
         self.node.send_command("stop")
-        self.log_message("⏸ STOP command sent")
+        self.log_message("[||] STOP command sent")
 
     def reset_system(self):
         """Send reset command."""
         self.node.send_command("reset")
-        self.log_message("🔄 RESET command sent")
+        self.log_message("[R] RESET command sent")
 
     def emergency_stop(self):
         """Send emergency stop command."""
         self.node.send_command("emergency_stop")
-        self.log_message("⚠ EMERGENCY STOP activated!")
+        self.log_message("[!] EMERGENCY STOP activated!")
 
     def log_message(self, message: str):
         """Add message to status log."""
