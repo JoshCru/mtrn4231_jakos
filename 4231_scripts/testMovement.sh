@@ -37,6 +37,10 @@ echo "==========================================="
 echo "  Robot IP: $ROBOT_IP"
 echo "==========================================="
 echo ""
+echo "IMPORTANT: Make sure you press PLAY on the teach pendant"
+echo "           to start the External Control program!"
+echo ""
+read -p "Press Enter when ready..."
 
 source /opt/ros/humble/setup.bash
 source "${ROS2_WS}/install/setup.bash"
@@ -47,6 +51,13 @@ wait_for_enter
 ros2 launch ur_robot_driver ur_control.launch.py ur_type:=ur5e robot_ip:=$ROBOT_IP use_fake_hardware:=false launch_rviz:=false description_file:=ur5e_with_end_effector.urdf.xacro description_package:=motion_control_module &
 UR_PID=$!
 sleep 10
+
+# Activate joint trajectory controller
+echo "Activating joint_trajectory_controller..."
+ros2 control switch_controllers --activate joint_trajectory_controller --deactivate scaled_joint_trajectory_controller 2>/dev/null || \
+ros2 control switch_controllers --activate joint_trajectory_controller 2>/dev/null || \
+echo "Warning: Could not switch controllers, may already be active"
+sleep 2
 
 # 2. MoveIt
 echo "[2/3] Starting MoveIt..."

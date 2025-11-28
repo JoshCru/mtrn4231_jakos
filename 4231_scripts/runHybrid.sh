@@ -61,6 +61,13 @@ ros2 launch ur_robot_driver ur_control.launch.py ur_type:=ur5e robot_ip:=$ROBOT_
 UR_PID=$!
 sleep 10
 
+# Activate joint trajectory controller
+echo "Activating joint_trajectory_controller..."
+ros2 control switch_controllers --activate joint_trajectory_controller --deactivate scaled_joint_trajectory_controller 2>/dev/null || \
+ros2 control switch_controllers --activate joint_trajectory_controller 2>/dev/null || \
+echo "Warning: Could not switch controllers, may already be active"
+sleep 2
+
 # 2. MoveIt
 echo "[2/7] Starting MoveIt..."
 wait_for_enter
