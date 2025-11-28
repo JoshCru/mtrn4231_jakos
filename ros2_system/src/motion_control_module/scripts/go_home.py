@@ -39,7 +39,7 @@ class GoHomeNode(Node):
         self.action_client = ActionClient(
             self,
             FollowJointTrajectory,
-            '/joint_trajectory_controller/follow_joint_trajectory'
+            '/scaled_joint_trajectory_controller/follow_joint_trajectory'
         )
 
         self.get_logger().info('Waiting for joint trajectory action server...')
