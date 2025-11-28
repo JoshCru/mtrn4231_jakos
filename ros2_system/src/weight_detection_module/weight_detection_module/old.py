@@ -2,14 +2,12 @@
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Int32, Bool
 from sort_interfaces.srv import CalibrateBaseline
 import numpy as np
 from collections import deque
 import matplotlib.pyplot as plt
-import time
 
 class KalmanFilter:
     def __init__(self, process_variance=0.0015, measurement_variance=0.04):
@@ -125,25 +123,16 @@ class WeightDetector(Node):
     def __init__(self):
         super().__init__('weight_detector')
         
-        # Timing tracking - use time.time() for more accurate measurement
-        self.last_callback_time_system = None
+        # Timing tracking
+        self.last_callback_time = None
         self.callback_dt_history = deque(maxlen=100)
         self.callback_count = 0
-        self.messages_received = 0
-        
-        # Configure QoS to match publisher and avoid buffering
-        qos_profile = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,  # Don't wait for acknowledgments
-            durability=DurabilityPolicy.VOLATILE,       # Don't need late-joining behavior
-            history=HistoryPolicy.KEEP_LAST,           
-            depth=1                                      # Only keep the latest message
-        )
         
         self.subscription = self.create_subscription(
             JointState,
             '/joint_states',
             self.joint_state_callback,
-            qos_profile
+            10
         )
 
         self.weight_set = [20, 50, 100, 200, 500]
@@ -162,11 +151,10 @@ class WeightDetector(Node):
         self.torque_history = [deque(maxlen=self.history_length) for _ in range(self.num_joints)]
         self.filtered_torque_history = [deque(maxlen=self.history_length) for _ in range(self.num_joints)]
         
-        # Since we're getting slow callbacks, use Kalman filters tuned for that
+        # Use standard Kalman filters optimized for high-rate data
         self.kalman_filters = []
         for i in range(self.num_joints):
-            # Increased process variance for slow updates
-            kf = KalmanFilter(process_variance=0.001, measurement_variance=0.15)
+            kf = KalmanFilter(process_variance=0.0005, measurement_variance=0.2)
             self.kalman_filters.append(kf)
         
         self.kinematics = UR5eKinematics()
@@ -174,8 +162,8 @@ class WeightDetector(Node):
         self.calibration_factor = 5.0
         self.active_joints = [1, 2]
         
-        # Since callbacks are slow (1.5-3Hz), always use full system parameters
-        self.exp_amplitude_light = 5.15
+        # Calibration parameters - will auto-detect based on actual callback rate
+        self.exp_amplitude_light = 5.15   # Default to full system
         self.exp_amplitude_heavy = 6.9
         self.decay_light = 5.75
         self.decay_heavy = 2.95
@@ -189,32 +177,19 @@ class WeightDetector(Node):
         self.baseline_samples = []
         self.baseline_sample_size = 10
         self.calibrating_baseline = True
+        self.system_mode_detected = False
         
         self.current_joint_angles = None
         self.estimated_mass_grams = 0.0
         self.mass_history = deque(maxlen=self.history_length)
         
         self.declare_parameter('active_joints', self.active_joints)
-        self.declare_parameter('enable_plotting', True)
 
-        # Only create plotting if enabled
-        self.enable_plotting = self.get_parameter('enable_plotting').value
-        
-        if self.enable_plotting:
-            self.setup_plotting()
-            # Separate timer for plotting at lower rate
-            self.plot_timer = self.create_timer(0.1, self.update_plots)  # 10Hz plotting
-        
+        # Separate timer for plotting at lower rate
+        self.plot_timer = self.create_timer(0.1, self.update_plots)  # 10Hz plotting
         self.param_timer = self.create_timer(0.5, self.update_parameters)
         
-        # Diagnostic timer to report actual rates
-        self.diagnostic_timer = self.create_timer(5.0, self.report_diagnostics)
-        
-        self.get_logger().info('Weight detection module initialised - calibrating baseline...')
-        self.get_logger().info(f'Active joints for mass estimation: {[j+1 for j in self.active_joints]}')
-        self.get_logger().info('Callback rate is slow (1.5-3Hz) - using full system calibration parameters')
-    
-    def setup_plotting(self):
+        # Setup plotting
         plt.ion()
         self.fig = plt.figure(figsize=(14, 10))
         gs = self.fig.add_gridspec(3, 3, hspace=0.3)
@@ -247,18 +222,9 @@ class WeightDetector(Node):
         self.mass_ax.set_ylabel('Mass (g)')
         self.mass_ax.set_title('Estimated Mass')
         self.mass_ax.grid(True)
-    
-    def report_diagnostics(self):
-        if self.messages_received > 0 and len(self.callback_dt_history) > 10:
-            avg_dt = np.mean(list(self.callback_dt_history)[-10:])
-            avg_rate = 1.0 / avg_dt if avg_dt > 0 else 0
-            self.get_logger().info(
-                f"Diagnostics: {self.messages_received} messages received, "
-                f"callback rate: {avg_rate:.1f}Hz (expected: 350-500Hz from topic)"
-            )
-            
-            # This confirms the slow callback is the actual behavior
-            # The system is designed to work with this rate
+        
+        self.get_logger().info('Weight detection module initialised - calibrating baseline...')
+        self.get_logger().info(f'Active joints for mass estimation: {[j+1 for j in self.active_joints]}')
     
     def update_parameters(self):
         self.active_joints = self.get_parameter('active_joints').value
@@ -269,8 +235,8 @@ class WeightDetector(Node):
         self.baseline_torques = None
         self.baseline_samples = []
         self.calibrating_baseline = True
+        self.system_mode_detected = False
         self.callback_count = 0
-        self.messages_received = 0
 
         for kf in self.kalman_filters:
             kf.reset()
@@ -281,22 +247,34 @@ class WeightDetector(Node):
 
         response.success = True
         response.message = "Baseline recalibration started."
-        # At 1.5-3Hz, we need more time
-        response.wait_time_ms = 1000 * self.baseline_sample_size  # ~10 seconds
+        response.wait_time_ms = 550 * self.baseline_sample_size
         return response
 
     def joint_state_callback(self, msg):
-        # Track timing with system time for accuracy
-        current_time_system = time.time()
-        
-        if self.last_callback_time_system is not None:
-            dt = current_time_system - self.last_callback_time_system
+        # Track callback rate
+        current_time = self.get_clock().now()
+        if self.last_callback_time is not None:
+            dt = (current_time - self.last_callback_time).nanoseconds / 1e9
             if dt > 0:
                 self.callback_dt_history.append(dt)
-        
-        self.last_callback_time_system = current_time_system
+        self.last_callback_time = current_time
         self.callback_count += 1
-        self.messages_received += 1
+        
+        # Auto-detect system mode based on actual callback rate after 50 callbacks
+        if self.callback_count == 50 and not self.system_mode_detected:
+            if len(self.callback_dt_history) > 20:
+                avg_dt = np.mean(list(self.callback_dt_history)[-20:])
+                avg_rate = 1.0 / avg_dt if avg_dt > 0 else 0
+                
+                if avg_rate < 50:  # Less than 50Hz means we're being slowed down
+                    self.exp_amplitude_light = 5.15
+                    self.exp_amplitude_heavy = 6.9
+                    self.get_logger().info(f"Detected slow processing mode (rate: {avg_rate:.1f}Hz) - using full system parameters")
+                else:
+                    self.exp_amplitude_light = 6.85
+                    self.exp_amplitude_heavy = 7.69
+                    self.get_logger().info(f"Detected fast processing mode (rate: {avg_rate:.1f}Hz) - using standalone parameters")
+                self.system_mode_detected = True
         
         joint_torques = msg.effort[:self.num_joints] if len(msg.effort) >= self.num_joints else msg.effort
         joint_positions = msg.position[:self.num_joints] if len(msg.position) >= self.num_joints else msg.position
@@ -331,12 +309,9 @@ class WeightDetector(Node):
                 self.get_logger().info("Baseline calibration complete")
                 self.get_logger().info(f"Baseline torques for active joints: {self.baseline_torques}")
                 
-                if len(self.callback_dt_history) > 5:
-                    avg_dt = np.mean(list(self.callback_dt_history)[-5:])
-                    self.get_logger().info(
-                        f"Actual callback rate: {1/avg_dt:.1f}Hz "
-                        f"(topic publishes at 350-500Hz but callbacks are throttled)"
-                    )
+                if len(self.callback_dt_history) > 10:
+                    avg_dt = np.mean(list(self.callback_dt_history)[-10:])
+                    self.get_logger().info(f"Actual callback rate: {1/avg_dt:.1f}Hz")
         else:
             self.estimate_mass_physics(filtered_torques)
     
@@ -384,9 +359,7 @@ class WeightDetector(Node):
         self.mass_publisher.publish(mass_msg)
     
     def update_plots(self):
-        if not self.enable_plotting:
-            return
-            
+        # This now runs on a separate timer at 10Hz
         for i in range(self.num_joints):
             if len(self.torque_history[i]) > 0:
                 self.raw_lines[i].set_data(range(len(self.torque_history[i])), 
@@ -406,7 +379,7 @@ class WeightDetector(Node):
             timing_info = ""
             if len(self.callback_dt_history) > 10:
                 dt_mean = np.mean(list(self.callback_dt_history)[-10:])
-                timing_info = f" | Callback Rate: {1/dt_mean:.1f}Hz (throttled)"
+                timing_info = f" | Callback Rate: {1/dt_mean:.1f}Hz"
             
             self.mass_ax.set_title(
                 f'Estimated Mass (Calib={self.calibration_factor:.2f}): '
