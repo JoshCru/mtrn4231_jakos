@@ -86,7 +86,7 @@ class SortingBrainNode(Node):
     RZ = 0.0
 
     # Gap between placed weights (mm) - edge to edge gap
-    WEIGHT_GAP = 15.0
+    WEIGHT_GAP = 50
 
     # Weight sizes based on mass (mm diameter)
     # 500g = 43mm, 200g = 32mm, 100g = 25mm
