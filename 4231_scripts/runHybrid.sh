@@ -2,23 +2,14 @@
 # =============================================================================
 # Hybrid Mode (Real Robot + Simulated Perception)
 #
-# Launches the sorting system with:
-# - REAL robot hardware
-# - Simulated perception (4 random weights)
-# - Simulated weight estimation
-# - RViz visualization
-#
-# Use this for testing robot movements without Kevin's and Asad's nodes.
-#
 # Usage:
-#   ./runHybrid.sh [ROBOT_IP] [--autorun]
+#   ./runHybrid.sh [ROBOT_IP] [--autorun] [--step]
 #
 # Options:
 #   ROBOT_IP    Robot IP address (default: 192.168.0.100)
 #   --autorun   Automatically start sorting without dashboard
+#   --step      Pause before each node launch (for testing)
 # =============================================================================
-
-set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROS2_WS="${SCRIPT_DIR}/../ros2_system"
@@ -26,14 +17,17 @@ ROS2_WS="${SCRIPT_DIR}/../ros2_system"
 # Parse arguments
 ROBOT_IP="192.168.0.100"
 AUTORUN=false
+STEP_MODE=false
 
 for arg in "$@"; do
     case $arg in
         --autorun|-a)
             AUTORUN=true
             ;;
+        --step|-s)
+            STEP_MODE=true
+            ;;
         *)
-            # Assume it's the robot IP if it looks like an IP address
             if [[ $arg =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                 ROBOT_IP=$arg
             fi
@@ -41,185 +35,105 @@ for arg in "$@"; do
     esac
 done
 
+# Helper function for step mode
+wait_for_enter() {
+    if [ "$STEP_MODE" = true ]; then
+        read -p "Press Enter to continue..."
+    fi
+}
+
 echo "==========================================="
 echo "   Sorting System - HYBRID MODE"
 echo "==========================================="
+echo "  Robot IP: $ROBOT_IP"
+echo "  Autorun:  $AUTORUN"
+echo "  Step:     $STEP_MODE"
+echo "==========================================="
 echo ""
-echo "Configuration:"
-echo "  Robot:      REAL ($ROBOT_IP)"
-echo "  Perception: SIMULATED"
-echo "  Weights:    SIMULATED"
-echo "  Autorun:    $AUTORUN"
-echo ""
-echo "WARNING: Make sure the robot is:"
-echo "  - Powered on and in remote control mode"
-echo "  - At a safe position"
-echo "  - Clear of obstacles"
-echo ""
-read -p "Press Enter to continue or Ctrl+C to cancel..."
 
-# Source ROS2 and workspace
 source /opt/ros/humble/setup.bash
 source "${ROS2_WS}/install/setup.bash"
 
-# Set FastDDS profile for reliable communication
-export FASTRTPS_DEFAULT_PROFILES_FILE=/tmp/fastdds_profile.xml
-export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-
-# Create FastDDS profile
-cat > /tmp/fastdds_profile.xml << 'EOF'
-<?xml version="1.0" encoding="UTF-8" ?>
-<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
-    <transport_descriptors>
-        <transport_descriptor>
-            <transport_id>CustomUdpTransport</transport_id>
-            <type>UDPv4</type>
-        </transport_descriptor>
-    </transport_descriptors>
-    <participant profile_name="participant_profile" is_default_profile="true">
-        <rtps>
-            <userTransports>
-                <transport_id>CustomUdpTransport</transport_id>
-            </userTransports>
-            <useBuiltinTransports>false</useBuiltinTransports>
-        </rtps>
-    </participant>
-</profiles>
-EOF
-
-echo "[1/8] Starting UR5e Driver (REAL robot at $ROBOT_IP)..."
-ros2 launch ur_robot_driver ur_control.launch.py \
-    ur_type:=ur5e \
-    robot_ip:=$ROBOT_IP \
-    initial_joint_controller:=joint_trajectory_controller \
-    use_fake_hardware:=false \
-    launch_rviz:=false \
-    description_file:=ur5e_with_end_effector.urdf.xacro \
-    description_package:=motion_control_module &
-
+# 1. UR Driver
+echo "[1/7] Starting UR5e Driver..."
+wait_for_enter
+ros2 launch ur_robot_driver ur_control.launch.py ur_type:=ur5e robot_ip:=$ROBOT_IP use_fake_hardware:=false launch_rviz:=false description_file:=ur5e_with_end_effector.urdf.xacro description_package:=motion_control_module &
 UR_PID=$!
-echo "   UR Driver PID: $UR_PID"
+sleep 10
 
-echo ""
-echo "   Waiting for UR driver to initialize..."
-sleep 8
-
-echo ""
-echo "[2/8] Starting MoveIt with RViz..."
-ros2 launch motion_control_module ur5e_moveit_with_gripper.launch.py \
-    robot_ip:=$ROBOT_IP \
-    ur_type:=ur5e \
-    launch_rviz:=true &
-
+# 2. MoveIt
+echo "[2/7] Starting MoveIt..."
+wait_for_enter
+ros2 launch motion_control_module ur5e_moveit_with_gripper.launch.py robot_ip:=$ROBOT_IP ur_type:=ur5e launch_rviz:=true &
 MOVEIT_PID=$!
-echo "   MoveIt PID: $MOVEIT_PID"
 
-echo ""
-echo "   Waiting for MoveIt to initialize..."
+echo "Waiting for MoveIt to initialize..."
 sleep 5
 
-# Wait for robot_description_semantic parameter to be available
-echo "   Waiting for robot_description_semantic parameter..."
-timeout 30 bash -c 'until ros2 param list /move_group 2>/dev/null | grep -q robot_description_semantic; do sleep 1; done' || echo "   Warning: robot_description_semantic not found, continuing anyway..."
-
+echo "Waiting for robot_description_semantic parameter..."
+timeout 30 bash -c 'until ros2 param list /move_group 2>/dev/null | grep -q robot_description_semantic; do sleep 1; done' || echo "Warning: robot_description_semantic not found, continuing anyway..."
 sleep 2
 
-echo ""
-echo "[3/8] Starting Visualizations..."
-echo "   - Safety Boundary Visualizer"
+# 3. Safety Visualizer
+echo "[3/7] Starting Safety Visualizer..."
+wait_for_enter
 python3 "${ROS2_WS}/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_collision.py" &
 SAFETY_PID=$!
-
-echo "   - Simulated Perception Node (weights & zones)"
-ros2 run supervisor_module simulated_perception_node \
-    --ros-args -p num_objects:=4 -p publish_rate:=5.0 -p randomize_positions:=true &
-PERCEPTION_PID=$!
-
-echo "   Safety Visualizer PID: $SAFETY_PID"
-echo "   Perception Node PID: $PERCEPTION_PID"
-
-sleep 3
-
-echo ""
-echo "[4/8] Moving robot to HOME position..."
-ros2 run motion_control_module go_home 5.0
-echo "   Robot at home position"
-
-echo ""
-echo "[5/8] Starting Gripper Controller (real hardware)..."
-ros2 run control_module gripper_controller_node --ros-args -p simulation_mode:=false &
-
-GRIPPER_PID=$!
-echo "   Gripper Controller PID: $GRIPPER_PID"
-
 sleep 2
 
-echo ""
-echo "   Activating gripper controller (lifecycle)..."
+# 4. Simulated Perception
+echo "[4/7] Starting Simulated Perception..."
+wait_for_enter
+ros2 run supervisor_module simulated_perception_node --ros-args -p num_objects:=4 -p publish_rate:=5.0 -p randomize_positions:=true &
+PERCEPTION_PID=$!
+sleep 2
+
+# 5. Gripper Controller
+echo "[5/7] Starting Gripper Controller..."
+wait_for_enter
+ros2 run control_module gripper_controller_node --ros-args -p simulation_mode:=false &
+GRIPPER_PID=$!
+sleep 2
+
+echo "Activating gripper controller (lifecycle)..."
 ros2 lifecycle set /gripper_controller_node configure
 sleep 1
 ros2 lifecycle set /gripper_controller_node activate
 sleep 3
-echo "   Gripper controller ready"
 
-sleep 2
-
-echo ""
-echo "[6/8] Starting Cartesian Controller..."
+# 6. Cartesian Controller
+echo "[6/7] Starting Cartesian Controller..."
+wait_for_enter
 ros2 run motion_control_module cartesian_controller_node &
-
 CARTESIAN_PID=$!
-echo "   Cartesian Controller PID: $CARTESIAN_PID"
-
 sleep 3
 
-echo ""
-echo "[7/8] Starting Sorting Brain Node..."
+# 7. Sorting Brain
+echo "[7/7] Starting Sorting Brain..."
+wait_for_enter
 ros2 run supervisor_module sorting_brain_node &
-
 SORTING_PID=$!
-echo "   Sorting Brain PID: $SORTING_PID"
 
 echo ""
 echo "=========================================="
 echo "   All systems launched!"
 echo "=========================================="
 echo ""
-echo "Running processes:"
-echo "  - UR Driver (REAL):     PID $UR_PID"
-echo "  - MoveIt + RViz:        PID $MOVEIT_PID"
-echo "  - Safety Visualizer:    PID $SAFETY_PID"
-echo "  - Perception Node:      PID $PERCEPTION_PID (SIMULATED)"
-echo "  - Gripper Controller:   PID $GRIPPER_PID"
-echo "  - Cartesian Controller: PID $CARTESIAN_PID"
-echo "  - Sorting Brain:        PID $SORTING_PID"
-echo ""
 
-# Autorun or manual control
 if [ "$AUTORUN" = true ]; then
-    echo "[8/8] AUTORUN: Starting sorting automatically..."
+    echo "AUTORUN: Starting sorting..."
     sleep 2
     ros2 topic pub --once /sorting/command std_msgs/msg/String "data: 'start'"
-    echo "   Sorting started!"
-    echo ""
-    echo "System is running autonomously."
-    echo "Press Ctrl+C to stop all processes..."
+    echo "Sorting started!"
 else
-    echo "To control the system:"
-    echo "  Open another terminal and run: ./launchDashboard.sh"
-    echo "  Then click 'Start' in the dashboard"
-    echo ""
-    echo "Or restart with --autorun flag to auto-start sorting."
-    echo ""
-    echo "Press Ctrl+C to stop all processes..."
+    echo "Run ./launchDashboard.sh to control, or use --autorun"
 fi
-echo ""
 
-# Wait for any process to exit
+echo ""
+echo "Press Ctrl+C to stop..."
+
 wait -n
 
-# If one process exits, kill the others
-echo "A process exited, shutting down..."
+echo "Shutting down..."
 kill $UR_PID $MOVEIT_PID $GRIPPER_PID $CARTESIAN_PID $SAFETY_PID $PERCEPTION_PID $SORTING_PID 2>/dev/null || true
-
 echo "Done."
