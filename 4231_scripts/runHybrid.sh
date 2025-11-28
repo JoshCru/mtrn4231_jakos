@@ -78,22 +78,28 @@ echo "Waiting for robot_description_semantic parameter..."
 timeout 30 bash -c 'until ros2 param list /move_group 2>/dev/null | grep -q robot_description_semantic; do sleep 1; done' || echo "Warning: robot_description_semantic not found, continuing anyway..."
 sleep 2
 
-# 3. Safety Visualizer
-echo "[3/7] Starting Safety Visualizer..."
+# 3. Go Home
+echo "[3/8] Moving robot to HOME position..."
+wait_for_enter
+ros2 run motion_control_module go_home 5.0
+echo "Robot at home position"
+
+# 4. Safety Visualizer
+echo "[4/8] Starting Safety Visualizer..."
 wait_for_enter
 python3 "${ROS2_WS}/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_collision.py" &
 SAFETY_PID=$!
 sleep 2
 
-# 4. Simulated Perception
-echo "[4/7] Starting Simulated Perception..."
+# 5. Simulated Perception
+echo "[5/8] Starting Simulated Perception..."
 wait_for_enter
 ros2 run supervisor_module simulated_perception_node --ros-args -p num_objects:=4 -p publish_rate:=5.0 -p randomize_positions:=true &
 PERCEPTION_PID=$!
 sleep 2
 
-# 5. Gripper Controller
-echo "[5/7] Starting Gripper Controller..."
+# 6. Gripper Controller
+echo "[6/8] Starting Gripper Controller..."
 wait_for_enter
 ros2 run control_module gripper_controller_node --ros-args -p simulation_mode:=false &
 GRIPPER_PID=$!
@@ -105,15 +111,15 @@ sleep 1
 ros2 lifecycle set /gripper_controller_node activate
 sleep 3
 
-# 6. Cartesian Controller
-echo "[6/7] Starting Cartesian Controller..."
+# 7. Cartesian Controller
+echo "[7/8] Starting Cartesian Controller..."
 wait_for_enter
-ros2 run motion_control_module cartesian_controller_node &
+ros2 run motion_control_module cartesian_controller_node --ros-args -p use_fake_hardware:=false &
 CARTESIAN_PID=$!
 sleep 3
 
-# 7. Sorting Brain
-echo "[7/7] Starting Sorting Brain..."
+# 8. Sorting Brain
+echo "[8/8] Starting Sorting Brain..."
 wait_for_enter
 ros2 run supervisor_module sorting_brain_node &
 SORTING_PID=$!

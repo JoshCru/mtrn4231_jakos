@@ -72,7 +72,7 @@ sleep 2
 # 3. Cartesian Controller
 echo "[3/3] Starting Cartesian Controller..."
 wait_for_enter
-ros2 run motion_control_module cartesian_controller_node &
+ros2 run motion_control_module cartesian_controller_node --ros-args -p use_fake_hardware:=false &
 CARTESIAN_PID=$!
 sleep 3
 
