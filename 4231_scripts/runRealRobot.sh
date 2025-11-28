@@ -10,6 +10,13 @@
 #
 # Use this for the final integrated system.
 #
+# Usage:
+#   ./runRealRobot.sh [ROBOT_IP] [--autorun]
+#
+# Options:
+#   ROBOT_IP    Robot IP address (default: 192.168.0.100)
+#   --autorun   Automatically start sorting without dashboard
+#
 # PREREQUISITES:
 #   - Kevin's perception nodes must be running separately
 #   - Robot must be powered on and in remote control mode
@@ -20,8 +27,23 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROS2_WS="${SCRIPT_DIR}/../ros2_system"
 
-# Get robot IP from argument or use default
-ROBOT_IP=${1:-"192.168.0.100"}
+# Parse arguments
+ROBOT_IP="192.168.0.100"
+AUTORUN=false
+
+for arg in "$@"; do
+    case $arg in
+        --autorun|-a)
+            AUTORUN=true
+            ;;
+        *)
+            # Assume it's the robot IP if it looks like an IP address
+            if [[ $arg =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                ROBOT_IP=$arg
+            fi
+            ;;
+    esac
+done
 
 echo "==========================================="
 echo "   Sorting System - FULL REAL MODE"
@@ -31,6 +53,7 @@ echo "Configuration:"
 echo "  Robot:      REAL ($ROBOT_IP)"
 echo "  Perception: REAL (Kevin's nodes - external)"
 echo "  Weights:    REAL (Asad's weight_detector - launched here)"
+echo "  Autorun:    $AUTORUN"
 echo ""
 echo "PREREQUISITES CHECK:"
 echo "  [ ] Robot powered on and in remote control mode"
@@ -178,11 +201,25 @@ echo ""
 echo "External dependencies (must be running):"
 echo "  - Kevin's perception nodes"
 echo ""
-echo "To control the system:"
-echo "  Open another terminal and run: ./launchDashboard.sh"
-echo "  Then click 'Start' in the dashboard"
-echo ""
-echo "Press Ctrl+C to stop all processes..."
+
+# Autorun or manual control
+if [ "$AUTORUN" = true ]; then
+    echo "AUTORUN: Starting sorting automatically..."
+    sleep 2
+    ros2 topic pub --once /sorting/command std_msgs/msg/String "data: 'start'"
+    echo "   Sorting started!"
+    echo ""
+    echo "System is running autonomously."
+    echo "Press Ctrl+C to stop all processes..."
+else
+    echo "To control the system:"
+    echo "  Open another terminal and run: ./launchDashboard.sh"
+    echo "  Then click 'Start' in the dashboard"
+    echo ""
+    echo "Or restart with --autorun flag to auto-start sorting."
+    echo ""
+    echo "Press Ctrl+C to stop all processes..."
+fi
 echo ""
 
 # Wait for any process to exit
