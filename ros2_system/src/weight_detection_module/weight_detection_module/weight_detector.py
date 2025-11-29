@@ -377,8 +377,7 @@ class WeightDetector(Node):
 
         self.mass_history.append(self.estimated_mass_grams)
 
-        # snapped_mass_grams = self.snap_to_weight_set(self.estimated_mass_grams)
-        snapped_mass_grams = self.estimated_mass_grams
+        snapped_mass_grams = self.snap_to_weight_set(self.estimated_mass_grams)
         mass_msg = Int32()
         mass_msg.data = int(snapped_mass_grams)
         self.mass_publisher.publish(mass_msg)

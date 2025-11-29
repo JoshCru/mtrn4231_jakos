@@ -171,22 +171,26 @@ public:
                        calibrating_baseline_(true),
                        calibration_factor_(5.0),
                        estimated_mass_grams_(0.0),
-                       messages_received_(0)
+                       messages_received_(0),
+                       callback_counter_(0),
+                       process_decimation_(5)
     {
 
         // Parameters
         this->declare_parameter("active_joints", std::vector<int64_t>{1, 2});
-        this->declare_parameter("baseline_sample_size", 2000);
+        this->declare_parameter("baseline_sample_size", 350); // At decimation=5, ~5 seconds at 400Hz
+        this->declare_parameter("process_decimation", 10);    // Process every Nth message (500Hz/5 = 100Hz)
 
         active_joints_ = this->get_parameter("active_joints").as_integer_array();
         baseline_sample_size_ = this->get_parameter("baseline_sample_size").as_int();
+        process_decimation_ = this->get_parameter("process_decimation").as_int();
 
         // Calibration parameters (matching Python)
-        exp_amplitude_light_ = 8.25;
-        exp_amplitude_heavy_ = 6.9;
+        exp_amplitude_light_ = 10.5;
+        exp_amplitude_heavy_ = 8.45;
         decay_light_ = 5.75;
         decay_heavy_ = 2.95;
-        mass_threshold_ = 3 / calibration_factor_;
+        mass_threshold_ = 0.3 / calibration_factor_;
         min_threshold_ = 0.0175 / calibration_factor_;
 
         // Weight set for snapping
@@ -196,7 +200,7 @@ public:
         for (int i = 0; i < 6; ++i)
         {
             double process_variance = 0.0005;
-            double measurement_variance = 0.5;
+            double measurement_variance = 15;
             kalman_filters_.emplace_back(process_variance, measurement_variance);
         }
 
@@ -271,11 +275,18 @@ private:
 
         response->success = true;
         response->message = "Baseline recalibration started.";
-        response->wait_time_ms = 1000 * baseline_sample_size_;
+        response->wait_time_ms = 2.75 * baseline_sample_size_;
     }
 
     void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg)
     {
+        // Decimate input frequency: only process every Nth message
+        callback_counter_++;
+        if (callback_counter_ % process_decimation_ != 0)
+        {
+            return;
+        }
+
         auto current_time = std::chrono::high_resolution_clock::now();
 
         // Track timing
@@ -536,6 +547,10 @@ private:
     size_t messages_received_;
 
     std::vector<int> weight_set_;
+
+    // Input decimation
+    size_t callback_counter_;
+    int process_decimation_;
 };
 
 int main(int argc, char **argv)
