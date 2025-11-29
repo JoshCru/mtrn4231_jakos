@@ -177,31 +177,37 @@ public:
     {
 
         // Parameters
-        this->declare_parameter("active_joints", std::vector<int64_t>{1, 2});
-        this->declare_parameter("baseline_sample_size", 220); // At decimation=5, ~5 seconds at 400Hz
-        this->declare_parameter("process_decimation", 10);    // Process every Nth message (500Hz/10 = 50Hz)
+        this->declare_parameter("active_joints", std::vector<int64_t>{1, 2}); // Joints 1 -> 6 (0-indexed), {1,2} = joints 2 and 3
+        this->declare_parameter("process_decimation", 10);                    // Process every Nth message (500Hz/10 = 50Hz)
+        this->declare_parameter("baseline_sample_size", 220);                 // At decimation=10, ~5.5 seconds at 500Hz
 
         active_joints_ = this->get_parameter("active_joints").as_integer_array();
         baseline_sample_size_ = this->get_parameter("baseline_sample_size").as_int();
         process_decimation_ = this->get_parameter("process_decimation").as_int();
 
-        // Calibration mode toggle
-        this->declare_parameter("use_polynomial_calibration", false);
-        use_polynomial_calibration_ = this->get_parameter("use_polynomial_calibration").as_bool();
+        // Snapping mode toggle: when true, uses exponential calibration and
+        // snaps to weight set (0, 50, 100, 200, 500)
+        // When false, uses polynomial calibration and rounds to nearest 5g
+        this->declare_parameter("useSnapping", true);
+        use_snapping_ = this->get_parameter("useSnapping").as_bool();
 
         // Exponential calibration parameters
-        exp_amplitude_light_ = 10.5;
+        exp_amplitude_light_ = 15;
         exp_amplitude_heavy_ = 8.45;
         decay_light_ = 5.75;
         decay_heavy_ = 2.95;
-        mass_threshold_ = 0.3 / calibration_factor_;
-        min_threshold_ = 0.0175 / calibration_factor_;
+
+        // Thresholds
+        mass_threshold_ = 0.3; // kg, used to switch between calibration gains (in both exponential & polynomial)
+        mass_threshold_ /= calibration_factor_;
+        min_threshold_ = 0.0175; // kg, values below this are ignored
+        min_threshold_ /= calibration_factor_;
 
         // Polynomial calibration parameters
         this->declare_parameter("poly_coeff_a", 0.0);     // cubic term (unused)
-        this->declare_parameter("poly_coeff_b", -0.2621); // quadratic term
-        this->declare_parameter("poly_coeff_c", 29.96);   // linear term
-        this->declare_parameter("poly_coeff_d", -323.0);  // constant term
+        this->declare_parameter("poly_coeff_b", -0.1463); // quadratic term
+        this->declare_parameter("poly_coeff_c", 19.55);   // linear term
+        this->declare_parameter("poly_coeff_d", -152.7);  // constant term
 
         poly_coeff_a_ = this->get_parameter("poly_coeff_a").as_double();
         poly_coeff_b_ = this->get_parameter("poly_coeff_b").as_double();
@@ -211,7 +217,7 @@ public:
         // Weight set for snapping
         weight_set_ = {50, 100, 200, 500};
 
-        // Initialize Kalman filters (6 joints)
+        // Kalman filters (6 joints)
         for (int i = 0; i < 6; ++i)
         {
             double process_variance = 0.0005;
@@ -223,18 +229,18 @@ public:
         auto qos = rclcpp::SensorDataQoS();
         qos.keep_last(1);
 
-        // Subscription
+        // Subscription to UR5e Joint State Data
         joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
             "/joint_states",
             qos,
             std::bind(&WeightDetector::jointStateCallback, this, std::placeholders::_1));
 
-        // Publishers
+        // Publisher of estimated mass
         mass_pub_ = this->create_publisher<std_msgs::msg::Int32>("/estimated_mass", 10);
         calibration_status_pub_ = this->create_publisher<std_msgs::msg::Bool>(
             "/weight_detection/calibration_status", 10);
 
-        // Service
+        // Calibration service call
         calibration_service_ = this->create_service<sort_interfaces::srv::CalibrateBaseline>(
             "/weight_detection/calibrate_baseline",
             std::bind(&WeightDetector::calibrateBaselineCallback, this,
@@ -256,6 +262,8 @@ public:
                     "Active joints for mass estimation: [%ld, %ld]",
                     active_joints_.size() > 0 ? active_joints_[0] + 1 : 0,
                     active_joints_.size() > 1 ? active_joints_[1] + 1 : 0);
+        RCLCPP_INFO(this->get_logger(),
+                    "Snapping mode: %s", use_snapping_ ? "ENABLED" : "DISABLED");
     }
 
 private:
@@ -422,11 +430,36 @@ private:
         double raw_mass = std::abs(kinematics_.estimateMass(torque_deltas, active_moment_arms));
         double raw_grams = raw_mass * 1000.0;
 
-        double calibrated_grams = 0.0;
+        int output_mass = 0;
 
-        if (use_polynomial_calibration_)
+        RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                              "Raw mass: %.4f grams", raw_grams);
+
+        if (use_snapping_)
         {
-            // Polynomial calibration mode
+            // Exponential calibration mode + snap to weight set (0, 50, 100, 200, 500)
+            if (raw_mass < min_threshold_)
+            {
+                calibration_factor_ = 0.0;
+            }
+            else if (raw_mass < mass_threshold_)
+            {
+                calibration_factor_ = exp_amplitude_light_ * std::exp(-decay_light_ * raw_mass);
+            }
+            else
+            {
+                calibration_factor_ = exp_amplitude_heavy_ * std::exp(-decay_heavy_ * raw_mass);
+            }
+
+            estimated_mass_grams_ = raw_mass * calibration_factor_ * 1000.0;
+            estimated_mass_grams_ = std::round(estimated_mass_grams_ / 5.0) * 5.0;
+
+            output_mass = snapToWeightSet(estimated_mass_grams_);
+        }
+        else
+        {
+            // Polynomial calibration mode + round to nearest 5g (no snapping)
+            double calibrated_grams = 0.0;
             double min_threshold_grams_ = min_threshold_ * 1000.0;
 
             if (raw_grams >= min_threshold_grams_)
@@ -446,69 +479,37 @@ private:
             estimated_mass_grams_ = std::max(0.0, calibrated_grams);
             estimated_mass_grams_ = std::round(estimated_mass_grams_ / 5.0) * 5.0;
 
-            // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-            //                      "Polynomial - Raw grams: %.2f -> Calibrated: %.1f", raw_grams, estimated_mass_grams_);
+            output_mass = static_cast<int>(estimated_mass_grams_);
         }
-        else
-        {
-            // Exponential calibration mode
-            if (raw_mass < min_threshold_)
-            {
-                calibration_factor_ = 0.0;
-            }
-            else if (raw_mass < mass_threshold_)
-            {
-                calibration_factor_ = exp_amplitude_light_ * std::exp(-decay_light_ * raw_mass);
-            }
-            else
-            {
-                calibration_factor_ = exp_amplitude_heavy_ * std::exp(-decay_heavy_ * raw_mass);
-            }
-
-            estimated_mass_grams_ = raw_mass * calibration_factor_ * 1000.0;
-            estimated_mass_grams_ = std::round(estimated_mass_grams_ / 5.0) * 5.0;
-
-            // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-            //                      "Exponential - Raw mass: %.4f kg -> Calibrated: %.1f g", raw_mass, estimated_mass_grams_);
-        }
-
-        int snapped_mass = estimated_mass_grams_;
-        snapped_mass = snapToWeightSet(estimated_mass_grams_);
 
         auto mass_msg = std_msgs::msg::Int32();
-        mass_msg.data = static_cast<int>(snapped_mass);
+        mass_msg.data = output_mass;
         mass_pub_->publish(mass_msg);
     }
 
     int snapToWeightSet(double estimated_mass)
     {
-        if (weight_set_.empty())
+        // Range-based snapping
+        if (estimated_mass <= 17.5)
+        {
             return 0;
-
-        int closest_weight = weight_set_[0];
-        double min_diff = std::abs(estimated_mass - weight_set_[0]);
-
-        for (int w : weight_set_)
-        {
-            double diff = std::abs(estimated_mass - w);
-            if (diff < min_diff)
-            {
-                min_diff = diff;
-                closest_weight = w;
-            }
         }
-
-        // Special rule: if snapping to 50g but estimate >= 45g, snap to 100g instead
-        if (closest_weight == 50 && estimated_mass >= 45)
+        else if (estimated_mass <= 45)
         {
-            closest_weight = 100;
+            return 50;
         }
-        else if (closest_weight == 50 && estimated_mass <= 17.5)
+        else if (estimated_mass <= 185)
         {
-            closest_weight = 0;
+            return 100;
         }
-
-        return closest_weight;
+        else if (estimated_mass <= 375)
+        {
+            return 200;
+        }
+        else
+        {
+            return 500;
+        }
     }
 
     std::vector<double> calculateMedian(const std::vector<std::vector<double>> &samples)
@@ -579,7 +580,7 @@ private:
     std::vector<int64_t> active_joints_;
 
     // Calibration parameters
-    bool use_polynomial_calibration_;
+    bool use_snapping_; // When false, uses polynomial calibration (equivalent to deprecated use_polynomial_calibration=true)
     double calibration_factor_;
 
     // Exponential calibration
