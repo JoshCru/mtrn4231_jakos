@@ -178,14 +178,18 @@ public:
 
         // Parameters
         this->declare_parameter("active_joints", std::vector<int64_t>{1, 2});
-        this->declare_parameter("baseline_sample_size", 350); // At decimation=5, ~5 seconds at 400Hz
-        this->declare_parameter("process_decimation", 10);    // Process every Nth message (500Hz/5 = 100Hz)
+        this->declare_parameter("baseline_sample_size", 220); // At decimation=5, ~5 seconds at 400Hz
+        this->declare_parameter("process_decimation", 10);    // Process every Nth message (500Hz/10 = 50Hz)
 
         active_joints_ = this->get_parameter("active_joints").as_integer_array();
         baseline_sample_size_ = this->get_parameter("baseline_sample_size").as_int();
         process_decimation_ = this->get_parameter("process_decimation").as_int();
 
-        // Calibration parameters (matching Python)
+        // Calibration mode toggle
+        this->declare_parameter("use_polynomial_calibration", false);
+        use_polynomial_calibration_ = this->get_parameter("use_polynomial_calibration").as_bool();
+
+        // Exponential calibration parameters
         exp_amplitude_light_ = 10.5;
         exp_amplitude_heavy_ = 8.45;
         decay_light_ = 5.75;
@@ -193,8 +197,19 @@ public:
         mass_threshold_ = 0.3 / calibration_factor_;
         min_threshold_ = 0.0175 / calibration_factor_;
 
+        // Polynomial calibration parameters
+        this->declare_parameter("poly_coeff_a", 0.0);     // cubic term (unused)
+        this->declare_parameter("poly_coeff_b", -0.2621); // quadratic term
+        this->declare_parameter("poly_coeff_c", 29.96);   // linear term
+        this->declare_parameter("poly_coeff_d", -323.0);  // constant term
+
+        poly_coeff_a_ = this->get_parameter("poly_coeff_a").as_double();
+        poly_coeff_b_ = this->get_parameter("poly_coeff_b").as_double();
+        poly_coeff_c_ = this->get_parameter("poly_coeff_c").as_double();
+        poly_coeff_d_ = this->get_parameter("poly_coeff_d").as_double();
+
         // Weight set for snapping
-        weight_set_ = {20, 50, 100, 200, 500};
+        weight_set_ = {50, 100, 200, 500};
 
         // Initialize Kalman filters (6 joints)
         for (int i = 0; i < 6; ++i)
@@ -275,7 +290,7 @@ private:
 
         response->success = true;
         response->message = "Baseline recalibration started.";
-        response->wait_time_ms = 2.75 * baseline_sample_size_;
+        response->wait_time_ms = 26 * baseline_sample_size_;
     }
 
     void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg)
@@ -390,17 +405,14 @@ private:
             return;
         }
 
-        // Calculate torque deltas for active joints
         Eigen::VectorXd torque_deltas(active_joints_.size());
         for (size_t i = 0; i < active_joints_.size(); ++i)
         {
             torque_deltas(i) = filtered_torques[active_joints_[i]] - baseline_torques_[i];
         }
 
-        // Get moment arms
         Eigen::Vector3d all_moment_arms = kinematics_.computeMomentArms(current_joint_angles_);
 
-        // Extract moment arms for active joints (j-1 because moment arms are for joints 2,3,4)
         Eigen::VectorXd active_moment_arms(active_joints_.size());
         for (size_t i = 0; i < active_joints_.size(); ++i)
         {
@@ -408,30 +420,63 @@ private:
         }
 
         double raw_mass = std::abs(kinematics_.estimateMass(torque_deltas, active_moment_arms));
+        double raw_grams = raw_mass * 1000.0;
 
-        // Piecewise exponential calibration
-        if (raw_mass < min_threshold_)
+        double calibrated_grams = 0.0;
+
+        if (use_polynomial_calibration_)
         {
-            calibration_factor_ = 0.0;
-        }
-        else if (raw_mass < mass_threshold_)
-        {
-            calibration_factor_ = exp_amplitude_light_ * std::exp(-decay_light_ * raw_mass);
+            // Polynomial calibration mode
+            double min_threshold_grams_ = min_threshold_ * 1000.0;
+
+            if (raw_grams >= min_threshold_grams_)
+            {
+                if (raw_grams > 80.0)
+                {
+                    // Linear extrapolation for high values (during transients)
+                    // Use gradient from 500g region
+                    calibrated_grams = 500.0 + (raw_grams - 68.4) * 4.0;
+                }
+                else
+                {
+                    calibrated_grams = poly_coeff_b_ * raw_grams * raw_grams + poly_coeff_c_ * raw_grams + poly_coeff_d_;
+                }
+            }
+
+            estimated_mass_grams_ = std::max(0.0, calibrated_grams);
+            estimated_mass_grams_ = std::round(estimated_mass_grams_ / 5.0) * 5.0;
+
+            // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+            //                      "Polynomial - Raw grams: %.2f -> Calibrated: %.1f", raw_grams, estimated_mass_grams_);
         }
         else
         {
-            calibration_factor_ = exp_amplitude_heavy_ * std::exp(-decay_heavy_ * raw_mass);
+            // Exponential calibration mode
+            if (raw_mass < min_threshold_)
+            {
+                calibration_factor_ = 0.0;
+            }
+            else if (raw_mass < mass_threshold_)
+            {
+                calibration_factor_ = exp_amplitude_light_ * std::exp(-decay_light_ * raw_mass);
+            }
+            else
+            {
+                calibration_factor_ = exp_amplitude_heavy_ * std::exp(-decay_heavy_ * raw_mass);
+            }
+
+            estimated_mass_grams_ = raw_mass * calibration_factor_ * 1000.0;
+            estimated_mass_grams_ = std::round(estimated_mass_grams_ / 5.0) * 5.0;
+
+            // RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+            //                      "Exponential - Raw mass: %.4f kg -> Calibrated: %.1f g", raw_mass, estimated_mass_grams_);
         }
 
-        estimated_mass_grams_ = raw_mass * calibration_factor_ * 1000.0;
-        estimated_mass_grams_ = std::round(estimated_mass_grams_ / 5.0) * 5.0;
-
-        // Snap to weight set
-        // int snapped_mass = snapToWeightSet(estimated_mass_grams_);
         int snapped_mass = estimated_mass_grams_;
-        // Publish
+        snapped_mass = snapToWeightSet(estimated_mass_grams_);
+
         auto mass_msg = std_msgs::msg::Int32();
-        mass_msg.data = snapped_mass;
+        mass_msg.data = static_cast<int>(snapped_mass);
         mass_pub_->publish(mass_msg);
     }
 
@@ -453,12 +498,12 @@ private:
             }
         }
 
-        // Special rules from Python
-        if (estimated_mass > 30 && closest_weight == 20)
+        // Special rule: if snapping to 50g but estimate >= 45g, snap to 100g instead
+        if (closest_weight == 50 && estimated_mass >= 45)
         {
-            closest_weight = 50;
+            closest_weight = 100;
         }
-        else if (estimated_mass < 12 && closest_weight == 20)
+        else if (closest_weight == 50 && estimated_mass <= 17.5)
         {
             closest_weight = 0;
         }
@@ -534,13 +579,23 @@ private:
     std::vector<int64_t> active_joints_;
 
     // Calibration parameters
+    bool use_polynomial_calibration_;
     double calibration_factor_;
+
+    // Exponential calibration
     double exp_amplitude_light_;
     double exp_amplitude_heavy_;
     double decay_light_;
     double decay_heavy_;
     double mass_threshold_;
     double min_threshold_;
+
+    // Polynomial calibration
+    double poly_coeff_a_;
+    double poly_coeff_b_;
+    double poly_coeff_c_;
+    double poly_coeff_d_;
+
     int baseline_sample_size_;
 
     double estimated_mass_grams_;
