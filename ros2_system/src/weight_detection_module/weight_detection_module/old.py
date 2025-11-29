@@ -17,17 +17,23 @@ class KalmanFilter:
         self.error_covariance = 1.0
         self.initialized = False
     
+    def reset(self):
+        """Reset filter state for recalibration."""
+        self.estimate = 0.0
+        self.error_covariance = 1.0
+        self.initialized = False
+
     def update(self, measurement):
         if not self.initialized:
             self.estimate = measurement
             self.initialized = True
             return self.estimate
-        
+
         self.error_covariance += self.process_variance
         kalman_gain = self.error_covariance / (self.error_covariance + self.measurement_variance)
         self.estimate += kalman_gain * (measurement - self.estimate)
         self.error_covariance *= (1 - kalman_gain)
-        
+
         return self.estimate
 
 class UR5eKinematics:
@@ -117,6 +123,11 @@ class WeightDetector(Node):
     def __init__(self):
         super().__init__('weight_detector')
         
+        # Timing tracking
+        self.last_callback_time = None
+        self.callback_dt_history = deque(maxlen=100)
+        self.callback_count = 0
+        
         self.subscription = self.create_subscription(
             JointState,
             '/joint_states',
@@ -127,11 +138,8 @@ class WeightDetector(Node):
         self.weight_set = [20, 50, 100, 200, 500]
 
         self.mass_publisher = self.create_publisher(Int32, '/estimated_mass', 10)
-
-        # Publish calibration status (True = calibrating, False = ready)
         self.calibration_status_publisher = self.create_publisher(Bool, '/weight_detection/calibration_status', 10)
 
-        # Service to trigger baseline recalibration
         self.calibration_service = self.create_service(
             CalibrateBaseline,
             '/weight_detection/calibrate_baseline',
@@ -143,8 +151,7 @@ class WeightDetector(Node):
         self.torque_history = [deque(maxlen=self.history_length) for _ in range(self.num_joints)]
         self.filtered_torque_history = [deque(maxlen=self.history_length) for _ in range(self.num_joints)]
         
-        # Original values: proc_var = 0.0005, meas_var = 0.15
-        # Alternative: proc_var = 0.0015, meas_var = 0.2
+        # Use standard Kalman filters optimized for high-rate data
         self.kalman_filters = []
         for i in range(self.num_joints):
             kf = KalmanFilter(process_variance=0.0005, measurement_variance=0.2)
@@ -152,26 +159,16 @@ class WeightDetector(Node):
         
         self.kinematics = UR5eKinematics()
 
-        self.calibration_factor = 5.0  # Changes dynamically based on estimated mass
-        self.active_joints = [1, 2]    # Joints 2,3,4 are indices 1,2,3
+        self.calibration_factor = 5.0
+        self.active_joints = [1, 2]
         
-        # Piecewise exponential calibration parameters
-            # If running all packages simultaneously
-        self.exp_amplitude_light = 5.15   # For lighter weights
-        self.exp_amplitude_heavy = 6.9  # For heavier weights
-
-            # If running only this package
-        # self.exp_amplitude_light = 6.85   # For lighter weights
-        # self.exp_amplitude_heavy = 7.69  # For heavier weights
-
-        self.decay_light = 5.75  # For lighter weights
-        self.decay_heavy = 2.95  # For heavier weights
-
-        # TODO: Cleanup this vvvv
-        # Threshold to switch from decay_light -> decay_heavy
-        self.mass_threshold = 0.3  # Threshold in kg, times by 5 for calibration
-        # e.g. mass_threshold = 0.05, 0.05 * 5 = 0.25kg
-        self.min_threshold = 0.0175  # Minimum threshold, values below this are zero'd
+        # Calibration parameters - will auto-detect based on actual callback rate
+        self.exp_amplitude_light = 5.15   # Default to full system
+        self.exp_amplitude_heavy = 6.9
+        self.decay_light = 5.75
+        self.decay_heavy = 2.95
+        self.mass_threshold = 0.3
+        self.min_threshold = 0.0175
         
         self.mass_threshold /= self.calibration_factor
         self.min_threshold /= self.calibration_factor
@@ -180,6 +177,7 @@ class WeightDetector(Node):
         self.baseline_samples = []
         self.baseline_sample_size = 10
         self.calibrating_baseline = True
+        self.system_mode_detected = False
         
         self.current_joint_angles = None
         self.estimated_mass_grams = 0.0
@@ -187,8 +185,11 @@ class WeightDetector(Node):
         
         self.declare_parameter('active_joints', self.active_joints)
 
+        # Separate timer for plotting at lower rate
+        self.plot_timer = self.create_timer(0.1, self.update_plots)  # 10Hz plotting
         self.param_timer = self.create_timer(0.5, self.update_parameters)
         
+        # Setup plotting
         plt.ion()
         self.fig = plt.figure(figsize=(14, 10))
         gs = self.fig.add_gridspec(3, 3, hspace=0.3)
@@ -229,27 +230,52 @@ class WeightDetector(Node):
         self.active_joints = self.get_parameter('active_joints').value
 
     def calibrate_baseline_callback(self, request, response):
-        """Service callback to trigger baseline recalibration.
-        Returns immediately - calibration happens asynchronously via joint_state_callback.
-        Response includes wait_time_ms indicating how long caller should wait."""
-        self.get_logger().info("Baseline recalibration requested - resetting baseline...")
+        self.get_logger().info("Baseline recalibration requested - resetting baseline and Kalman filters...")
 
         self.baseline_torques = None
         self.baseline_samples = []
         self.calibrating_baseline = True
+        self.system_mode_detected = False
+        self.callback_count = 0
 
-        # Publish calibration status
+        for kf in self.kalman_filters:
+            kf.reset()
+
         status_msg = Bool()
-        status_msg.data = True  # Calibrating
+        status_msg.data = True
         self.calibration_status_publisher.publish(status_msg)
 
-        # Return immediately - calibration happens in joint_state_callback
         response.success = True
         response.message = "Baseline recalibration started."
         response.wait_time_ms = 550 * self.baseline_sample_size
         return response
 
     def joint_state_callback(self, msg):
+        # Track callback rate
+        current_time = self.get_clock().now()
+        if self.last_callback_time is not None:
+            dt = (current_time - self.last_callback_time).nanoseconds / 1e9
+            if dt > 0:
+                self.callback_dt_history.append(dt)
+        self.last_callback_time = current_time
+        self.callback_count += 1
+        
+        # Auto-detect system mode based on actual callback rate after 50 callbacks
+        if self.callback_count == 50 and not self.system_mode_detected:
+            if len(self.callback_dt_history) > 20:
+                avg_dt = np.mean(list(self.callback_dt_history)[-20:])
+                avg_rate = 1.0 / avg_dt if avg_dt > 0 else 0
+                
+                if avg_rate < 50:  # Less than 50Hz means we're being slowed down
+                    self.exp_amplitude_light = 5.15
+                    self.exp_amplitude_heavy = 6.9
+                    self.get_logger().info(f"Detected slow processing mode (rate: {avg_rate:.1f}Hz) - using full system parameters")
+                else:
+                    self.exp_amplitude_light = 6.85
+                    self.exp_amplitude_heavy = 7.69
+                    self.get_logger().info(f"Detected fast processing mode (rate: {avg_rate:.1f}Hz) - using standalone parameters")
+                self.system_mode_detected = True
+        
         joint_torques = msg.effort[:self.num_joints] if len(msg.effort) >= self.num_joints else msg.effort
         joint_positions = msg.position[:self.num_joints] if len(msg.position) >= self.num_joints else msg.position
         
@@ -274,32 +300,27 @@ class WeightDetector(Node):
             self.baseline_samples.append(active_torques)
             if len(self.baseline_samples) >= self.baseline_sample_size:
                 self.baseline_torques = np.median(self.baseline_samples, axis=0)
-
                 self.calibrating_baseline = False
 
-                # Publish calibration complete status
                 status_msg = Bool()
-                status_msg.data = False  # Not calibrating (ready)
+                status_msg.data = False
                 self.calibration_status_publisher.publish(status_msg)
 
                 self.get_logger().info("Baseline calibration complete")
                 self.get_logger().info(f"Baseline torques for active joints: {self.baseline_torques}")
+                
+                if len(self.callback_dt_history) > 10:
+                    avg_dt = np.mean(list(self.callback_dt_history)[-10:])
+                    self.get_logger().info(f"Actual callback rate: {1/avg_dt:.1f}Hz")
         else:
             self.estimate_mass_physics(filtered_torques)
-        
-        self.update_plots()
     
     def snap_to_weight_set(self, estimated_mass_grams):
-        """Find the closest weight in weight_set to the estimated mass.
-        Special rule: if mass > 30g, don't snap to 20g (use 50g instead)."""
-
-        # Find closest weight
         weight_array = np.array(self.weight_set)
         differences = np.abs(weight_array - estimated_mass_grams)
         closest_idx = np.argmin(differences)
         closest_weight = self.weight_set[closest_idx]
 
-        # Special case: if > 30g and matched to 20g, use 50g instead
         if estimated_mass_grams > 30 and closest_weight == 20:
             closest_weight = 50
         elif estimated_mass_grams < 12 and closest_weight == 20:
@@ -319,23 +340,18 @@ class WeightDetector(Node):
 
         raw_mass = abs(self.kinematics.estimate_mass(torque_deltas, active_moment_arms))
         
-        # Piecewise exponential calibration factor
         if raw_mass < self.min_threshold:
             self.calibration_factor = 0.0
         elif raw_mass < self.mass_threshold:
-            # Use higher decay rate for lighter weights
             self.calibration_factor = self.exp_amplitude_light * np.exp(-self.decay_light * raw_mass)
         else:
-            # Use lower decay rate for heavier weights
             self.calibration_factor = self.exp_amplitude_heavy * np.exp(-self.decay_heavy * raw_mass)
 
         self.estimated_mass_grams = raw_mass * self.calibration_factor * 1000
-
         self.estimated_mass_grams = round(self.estimated_mass_grams / 5) * 5
 
         self.mass_history.append(self.estimated_mass_grams)
 
-        # Snap to closest weight in weight_set
         snapped_mass_grams = self.snap_to_weight_set(self.estimated_mass_grams)
 
         mass_msg = Int32()
@@ -343,6 +359,7 @@ class WeightDetector(Node):
         self.mass_publisher.publish(mass_msg)
     
     def update_plots(self):
+        # This now runs on a separate timer at 10Hz
         for i in range(self.num_joints):
             if len(self.torque_history[i]) > 0:
                 self.raw_lines[i].set_data(range(len(self.torque_history[i])), 
@@ -359,7 +376,15 @@ class WeightDetector(Node):
             self.mass_ax.relim()
             self.mass_ax.autoscale_view()
             
-            self.mass_ax.set_title(f'Estimated Mass (Calib={self.calibration_factor:.2f}): {self.estimated_mass_grams:.2f}g')
+            timing_info = ""
+            if len(self.callback_dt_history) > 10:
+                dt_mean = np.mean(list(self.callback_dt_history)[-10:])
+                timing_info = f" | Callback Rate: {1/dt_mean:.1f}Hz"
+            
+            self.mass_ax.set_title(
+                f'Estimated Mass (Calib={self.calibration_factor:.2f}): '
+                f'{self.estimated_mass_grams:.2f}g{timing_info}'
+            )
         
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
