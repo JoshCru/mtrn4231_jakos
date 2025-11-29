@@ -550,9 +550,9 @@ private:
             double avg_dt = std::accumulate(callback_dt_history_.begin(),
                                             callback_dt_history_.end(), 0.0) /
                             callback_dt_history_.size();
-            RCLCPP_INFO(this->get_logger(),
-                        "Diagnostics: %zu messages, callback rate: %.1f Hz",
-                        messages_received_, 1.0 / avg_dt);
+            RCLCPP_DEBUG(this->get_logger(),
+                         "Diagnostics: %zu messages, callback rate: %.1f Hz",
+                         messages_received_, 1.0 / avg_dt);
         }
     }
 

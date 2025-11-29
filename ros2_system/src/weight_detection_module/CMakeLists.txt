@@ -14,15 +14,15 @@ find_package(std_msgs REQUIRED)
 find_package(sort_interfaces REQUIRED)
 find_package(Eigen3 REQUIRED)
 
-# C++ executable
-add_executable(weight_detector_cpp src/weight_detector.cpp)
-target_include_directories(weight_detector_cpp PUBLIC
+# C++ executable (default)
+add_executable(weight_detector src/weight_detector.cpp)
+target_include_directories(weight_detector PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
   ${EIGEN3_INCLUDE_DIR}
 )
-target_compile_features(weight_detector_cpp PUBLIC cxx_std_17)
-ament_target_dependencies(weight_detector_cpp
+target_compile_features(weight_detector PUBLIC cxx_std_17)
+ament_target_dependencies(weight_detector
   rclcpp
   sensor_msgs
   std_msgs
@@ -30,16 +30,16 @@ ament_target_dependencies(weight_detector_cpp
 )
 
 # Install C++ executable
-install(TARGETS weight_detector_cpp
+install(TARGETS weight_detector
   DESTINATION lib/${PROJECT_NAME}
 )
 
 # Install Python modules
 ament_python_install_package(${PROJECT_NAME})
 
-# Install Python executables
+# Install Python executable (alternative)
 install(PROGRAMS
-  weight_detection_module/weight_detector.py
+  weight_detection_module/weight_detector_py.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
