@@ -3,6 +3,8 @@
 ROS2 Humble package for weight detection using UR5e joint torques.
 
 ## Usage
+Visualise the estimated mass plots using plotjuggler.
+
 
 ```bash
 colcon build --packages-select weight_detection_module
