@@ -75,6 +75,11 @@ Disable:
 ros2 run weight_detection_module weight_detector --ros-args -p useSnapping:=false
 ```
 
+### Test Scripts
+If needed, test scripts are available in the format `test_{ROS_NODE_LANGUAGE}_{MASS}.sh`, where `ROS_NODE_LANGUAGE` runs the C++ and/or Python implementation for a `MASS` of 100, 200, or 500 grams. For example, `test_cpp_and_py_100.sh` runs C++ and Python implementations with the [100 gram rosbag](../../../rosbags2/rosbag2_100_3cm_lift).
+
+The test processes data from a pre-recorded ROS bags found in the [rosbags2 directory.](../../../rosbags2/)
+
 ### Visualisation
 
 Use **PlotJuggler** to monitor the estimated mass topic in real-time:
