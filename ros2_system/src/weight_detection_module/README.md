@@ -103,4 +103,4 @@ ros2 run weight_detection_module weight_detector_py.py
 - **Calibration delay**: The node requires ~5.5 seconds of baseline calibration on startup before producing estimates. Wait for `/weight_detection/calibration_status` to publish `false` before measurements are valid.
 - **Recalibration required**: If the gripper or tool changes, call the calibration service to re-establish the baseline.
 - **Fixed baseline pose**: Gripper must return to the exact joint pose where calibration occurred for accurate estimates.
-- **Known weight set**: Snapping mode assumes payloads are one of {0, 50, 100, 200, 500}g. For arbitrary weights, disable snapping for more accurate continuous estimates.
+- **Known weight set**: Snapping mode assumes payloads are one of {0, 50, 100, 200, 500} grams. For arbitrary weights, disable snapping for more accurate continuous estimates.
