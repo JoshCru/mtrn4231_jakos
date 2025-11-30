@@ -19,8 +19,10 @@ sudo apt install -y \
     ros-humble-pcl-ros \
     ros-humble-rclcpp-lifecycle \
     ros-humble-rclcpp-action \
+    ros-humble-plotjuggler-ros \
     libopencv-dev \
-    libpcl-dev \    
+    libpcl-dev \
+    libeigen3-dev \
     python3-numpy \
     python3-matplotlib
 ```

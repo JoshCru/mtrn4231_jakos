@@ -193,7 +193,6 @@ def generate_launch_description():
         recognition_launch,
         planning_launch,
         control_launch,
-        motion_control_launch,
         weight_detection_launch,
         arduino_serial_node,
         # motion_control_launch,  # REMOVED: gripper_controller_node moved to control_module
