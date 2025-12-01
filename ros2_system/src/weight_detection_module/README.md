@@ -47,7 +47,7 @@ Current Joint Torques → Kalman Filter → Torque Deltas → Kinematics → Mas
 3. **Torque Filtering**: Incoming joint torques are smoothed using per-joint Kalman filters.
 4. **Mass Estimation**: The difference between current and baseline torques is used with UR5e forward kinematics to compute moment arms, then mass is estimated via $\tau = m \times g \times r$.
 5. **Output Estimate Calibration**:
-   The system now uses a polynomial gain factor to calibrate estimates.
+   The system now uses a polynomial gain factor of $ax^2 + bx + c$ to calibrate estimates.
    - **Snapping ON** (`useSnapping: true`): Estimates are generously snapped to discrete weight classes {0, 100, 200, 500}g, optimised for accuracy within the defined test weight set.
    - **Snapping OFF** (`useSnapping: false`): Provides continuous mass estimates, rounded to the nearest gram. This offers smoother results but may require more time to settle.
 
