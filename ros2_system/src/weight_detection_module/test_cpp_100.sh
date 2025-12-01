@@ -29,7 +29,7 @@ source install/setup.bash
 # Step 3: Launch C++ node in background
 echo -e "\n${GREEN}[3/3] Launching C++ weight detection node...${NC}"
 echo -e "${BLUE}Starting C++ node (/estimated_mass)...${NC}"
-ros2 run weight_detection_module weight_detector_cpp &
+ros2 run weight_detection_module weight_detector &
 CPP_PID=$!
 
 sleep 2

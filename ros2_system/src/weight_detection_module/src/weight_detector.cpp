@@ -464,16 +464,16 @@ private:
 
             if (raw_grams >= min_threshold_grams_)
             {
-                if (raw_grams > 80.0)
-                {
-                    // Linear extrapolation for high values (during transients)
-                    // Use gradient from 500g region
-                    calibrated_grams = 500.0 + (raw_grams - 68.4) * 4.0;
-                }
-                else
-                {
-                    calibrated_grams = poly_coeff_b_ * raw_grams * raw_grams + poly_coeff_c_ * raw_grams + poly_coeff_d_;
-                }
+                // if (raw_grams > 80.0)
+                // {
+                //     // Linear extrapolation for high values (during transients)
+                //     // Use gradient from 500g region
+                //     calibrated_grams = 500.0 + (raw_grams - 68.4) * 4.0;
+                // }
+                // else
+                // {
+                calibrated_grams = poly_coeff_b_ * raw_grams * raw_grams + poly_coeff_c_ * raw_grams + poly_coeff_d_;
+                // }
             }
 
             estimated_mass_grams_ = std::max(0.0, calibrated_grams);
@@ -481,6 +481,8 @@ private:
 
             output_mass = static_cast<int>(estimated_mass_grams_);
         }
+
+        // RCLCPP_INFO(this->get_logger(), "DEBUG: raw_grams=%.2f, estimated_mass=%.2f", raw_grams, estimated_mass_grams_);
 
         auto mass_msg = std_msgs::msg::Int32();
         mass_msg.data = output_mass;

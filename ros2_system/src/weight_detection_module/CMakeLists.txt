@@ -41,6 +41,7 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
   weight_detection_module/weight_detector_py.py
   DESTINATION lib/${PROJECT_NAME}
+  RENAME weight_detector_py
 )
 
 # Install launch files
