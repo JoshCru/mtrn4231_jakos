@@ -5,7 +5,7 @@
   <link name="gripper_base">
     <!-- Gripper mesh for visualization -->
     <visual>
-      <origin xyz="0 0 0" rpy="3.14159 0 0"/>  <!-- Flipped 180 degrees around X axis -->
+      <origin xyz="0 0 0" rpy="3.14159 0 1.5708"/>  <!-- Flipped 180 degrees around X axis -->
       <geometry>
         <mesh filename="package://motion_control_module/meshes/gripper.stl" scale="0.001 0.001 0.001"/>
       </geometry>

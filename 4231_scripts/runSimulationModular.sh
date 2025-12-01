@@ -41,6 +41,7 @@ echo "==========================================="
 echo "  Autorun: $AUTORUN"
 echo "  Step:    $STEP_MODE"
 echo "==========================================="
+echo "Note: Simulated perception - position check will run automatically"
 echo ""
 
 source /opt/ros/humble/setup.bash
@@ -51,8 +52,8 @@ echo "[1/8] Starting UR5e Driver (SIMULATION)..."
 wait_for_enter
 ros2 launch ur_robot_driver ur_control.launch.py \
     ur_type:=ur5e \
-    robot_ip:=192.168.0.100 \
-    initial_joint_controller:=joint_trajectory_controller \
+    robot_ip:=yyy.yyy.yyy.yyy \
+    initial_joint_controller:=scaled_joint_trajectory_controller \
     use_fake_hardware:=true \
     launch_rviz:=false \
     description_file:=ur5e_with_end_effector.urdf.xacro \
@@ -60,7 +61,7 @@ ros2 launch ur_robot_driver ur_control.launch.py \
 UR_PID=$!
 
 echo "Waiting for UR driver to initialize..."
-sleep 10
+sleep 5
 
 echo "Checking controllers..."
 ros2 control list_controllers
@@ -69,9 +70,9 @@ ros2 control list_controllers
 echo "[2/8] Starting MoveIt with RViz..."
 wait_for_enter
 ros2 launch motion_control_module ur5e_moveit_with_gripper.launch.py \
-    robot_ip:=192.168.0.100 \
     ur_type:=ur5e \
-    launch_rviz:=true &
+    launch_rviz:=true \
+    use_fake_hardware:=true &
 MOVEIT_PID=$!
 
 echo "Waiting for MoveIt to initialize..."
@@ -132,6 +133,32 @@ ros2 run motion_control_module cartesian_controller_node \
     -p use_fake_hardware:=true &
 CARTESIAN_PID=$!
 sleep 3
+
+# Position Check (automatic for simulated perception)
+echo ""
+echo "=========================================="
+echo "   SIMULATED PERCEPTION POSITION CHECK"
+echo "=========================================="
+echo ""
+echo "Running position check for simulated weights..."
+echo "The robot will visit each simulated weight position at Z_PICKUP."
+echo ""
+python3 "${ROS2_WS}/src/motion_control_module/scripts/check_simulated_positions.py"
+
+if [ $? -eq 0 ]; then
+    echo ""
+    echo "Position check completed successfully!"
+    echo ""
+else
+    echo ""
+    echo "Position check failed or was cancelled!"
+    read -p "Continue anyway? (y/n): " continue_response
+    if [[ ! $continue_response =~ ^[Yy]$ ]]; then
+        echo "Stopping..."
+        kill $UR_PID $MOVEIT_PID $GRIPPER_PID $CARTESIAN_PID $SAFETY_PID $PERCEPTION_PID 2>/dev/null || true
+        exit 1
+    fi
+fi
 
 # 9. Sorting Brain
 echo "[9/9] Starting Sorting Brain..."

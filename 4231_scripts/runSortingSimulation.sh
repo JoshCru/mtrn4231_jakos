@@ -65,7 +65,7 @@ echo "   UR Driver PID: $UR_PID"
 
 echo ""
 echo "   Waiting for UR driver to initialize..."
-sleep 8
+sleep 5
 
 echo ""
 echo "[2/8] Starting MoveIt..."

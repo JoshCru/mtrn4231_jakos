@@ -26,8 +26,8 @@ public:
 
     // Z heights in mm (tool0 frame) - from pick_and_place_demo.py
     static constexpr double Z_HOME = 371.0;
-    static constexpr double Z_DESCEND = 212.0;
-    static constexpr double Z_PICKUP = 182.0;
+    static constexpr double Z_DESCEND = 210.0;
+    static constexpr double Z_PICKUP = 180.0;
 
     // Default orientation (facing down)
     static constexpr double RX = 2.221;

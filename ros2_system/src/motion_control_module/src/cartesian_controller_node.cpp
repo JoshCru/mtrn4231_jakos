@@ -70,12 +70,10 @@ public:
         this->declare_parameter("use_fake_hardware", true);
         use_fake_hardware_ = this->get_parameter("use_fake_hardware").as_bool();
 
-        // Select controller based on hardware type
-        if (use_fake_hardware_) {
-            controller_name_ = "/joint_trajectory_controller/follow_joint_trajectory";
-        } else {
-            controller_name_ = "/scaled_joint_trajectory_controller/follow_joint_trajectory";
-        }
+        // Both simulation and real hardware use scaled_joint_trajectory_controller
+        // Simulation: explicitly set in launch
+        // Real hardware: default controller
+        controller_name_ = "/scaled_joint_trajectory_controller/follow_joint_trajectory";
 
         RCLCPP_INFO(this->get_logger(), "Using controller: %s", controller_name_.c_str());
 

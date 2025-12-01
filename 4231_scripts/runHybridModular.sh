@@ -6,10 +6,12 @@
 #   ./runHybridModular.sh [ROBOT_IP] [--autorun] [--step] [--real-weight]
 #
 # Options:
-#   ROBOT_IP        Robot IP address (default: 192.168.0.100)
-#   --autorun       Automatically start sorting without dashboard
-#   --step          Pause before each node launch (for testing)
-#   --real-weight   Use real weight detection instead of simulated
+#   ROBOT_IP           Robot IP address (default: 192.168.0.100)
+#   --autorun          Automatically start sorting without dashboard
+#   --step             Pause before each node launch (for testing)
+#   --real-weight      Use real weight detection instead of simulated
+#
+# Note: Position check is automatic with simulated perception
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -50,11 +52,12 @@ wait_for_enter() {
 echo "==========================================="
 echo "   Sorting System - HYBRID MODE (Modular)"
 echo "==========================================="
-echo "  Robot IP:    $ROBOT_IP"
-echo "  Autorun:     $AUTORUN"
-echo "  Step:        $STEP_MODE"
-echo "  Real Weight: $REAL_WEIGHT"
+echo "  Robot IP:         $ROBOT_IP"
+echo "  Autorun:          $AUTORUN"
+echo "  Step:             $STEP_MODE"
+echo "  Real Weight:      $REAL_WEIGHT"
 echo "==========================================="
+echo "Note: Simulated perception - position check will run automatically"
 echo ""
 
 source /opt/ros/humble/setup.bash
@@ -166,6 +169,32 @@ ros2 run motion_control_module cartesian_controller_node \
     -p use_fake_hardware:=false &
 CARTESIAN_PID=$!
 sleep 3
+
+# Position Check (automatic for simulated perception)
+echo ""
+echo "=========================================="
+echo "   SIMULATED PERCEPTION POSITION CHECK"
+echo "=========================================="
+echo ""
+echo "Running position check for simulated weights..."
+echo "The robot will visit each simulated weight position at Z_PICKUP."
+echo ""
+python3 "${ROS2_WS}/src/motion_control_module/scripts/check_simulated_positions.py"
+
+if [ $? -eq 0 ]; then
+    echo ""
+    echo "Position check completed successfully!"
+    echo ""
+else
+    echo ""
+    echo "Position check failed or was cancelled!"
+    read -p "Continue anyway? (y/n): " continue_response
+    if [[ ! $continue_response =~ ^[Yy]$ ]]; then
+        echo "Stopping..."
+        kill $UR_PID $MOVEIT_PID $GRIPPER_PID $CARTESIAN_PID $SAFETY_PID $PERCEPTION_PID $WEIGHT_PID $PLOT_PID 2>/dev/null || true
+        exit 1
+    fi
+fi
 
 # 9. Sorting Brain
 echo "[9/9] Starting Sorting Brain..."

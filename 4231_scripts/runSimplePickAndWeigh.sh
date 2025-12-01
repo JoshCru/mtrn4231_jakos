@@ -81,14 +81,26 @@ source "${ROS2_WS}/install/setup.bash"
 # 1. UR Driver
 echo "[1/7] Starting UR5e Driver..."
 wait_for_enter
-ros2 launch ur_robot_driver ur_control.launch.py \
-    ur_type:=ur5e \
-    robot_ip:=$ROBOT_IP \
-    initial_joint_controller:=scaled_joint_trajectory_controller \
-    use_fake_hardware:=$USE_FAKE_HARDWARE \
-    launch_rviz:=false \
-    description_file:=ur5e_with_end_effector.urdf.xacro \
-    description_package:=motion_control_module &
+if [ "$USE_FAKE_HARDWARE" = true ]; then
+    # Simulation mode - use scaled_joint_trajectory_controller
+    ros2 launch ur_robot_driver ur_control.launch.py \
+        ur_type:=ur5e \
+        robot_ip:=$ROBOT_IP \
+        initial_joint_controller:=scaled_joint_trajectory_controller \
+        use_fake_hardware:=$USE_FAKE_HARDWARE \
+        launch_rviz:=false \
+        description_file:=ur5e_with_end_effector.urdf.xacro \
+        description_package:=motion_control_module &
+else
+    # Real hardware mode - use default controller
+    ros2 launch ur_robot_driver ur_control.launch.py \
+        ur_type:=ur5e \
+        robot_ip:=$ROBOT_IP \
+        use_fake_hardware:=$USE_FAKE_HARDWARE \
+        launch_rviz:=false \
+        description_file:=ur5e_with_end_effector.urdf.xacro \
+        description_package:=motion_control_module &
+fi
 UR_PID=$!
 
 echo "Waiting for UR driver to initialize..."
@@ -150,23 +162,17 @@ else
 fi
 
 # 6. Weight Detection
-WEIGHT_PID=""
-if [ "$USE_FAKE_HARDWARE" = true ]; then
-    echo "[6/7] Starting Real Weight Detection..."
-    wait_for_enter
-    ros2 run weight_detection_module weight_detector &
-    WEIGHT_PID=$!
-    sleep 2
+echo "[6/7] Starting Weight Detection..."
+wait_for_enter
+ros2 run weight_detection_module weight_detector &
+WEIGHT_PID=$!
+sleep 2
 
-    # Launch PlotJuggler for weight visualization (after weight detector starts)
-    echo "Starting PlotJuggler for weight visualization..."
-    "${ROS2_WS}/plot_weight.sh" &
-    PLOT_PID=$!
-    sleep 2
-else
-    echo "[6/7] Skipping Weight Detection (fake hardware - no real weight sensor)"
-    PLOT_PID=""
-fi
+# Launch PlotJuggler for weight visualization (after weight detector starts)
+echo "Starting PlotJuggler for weight visualization..."
+"${ROS2_WS}/plot_weight.sh" &
+PLOT_PID=$!
+sleep 2
 
 # 7. Gripper Controller
 echo "[7/7] Starting Gripper Controller..."

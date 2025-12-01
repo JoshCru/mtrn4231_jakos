@@ -26,6 +26,7 @@
 #include <memory>
 #include <fstream>
 #include <iostream>
+#include <map>
 
 namespace motion_control_module
 {
@@ -33,15 +34,20 @@ namespace motion_control_module
 class SimplePickAndWeighNode : public rclcpp::Node
 {
 public:
-    // Z heights (mm) - tool0 frame
-    static constexpr double Z_HOME = 371.0;
-    static constexpr double Z_DESCEND = 212.0;
-    static constexpr double Z_PICKUP = 182.0;
+    // Z heights (mm) - tool0 frame - loaded from config
+    double Z_HOME = 371.0;
+    double Z_DESCEND = 210.0;
+    double Z_PICKUP = 180.0;
+    double Z_PLACE = 180.0;
 
-    // Default orientation (facing down)
-    static constexpr double RX = 2.221;
-    static constexpr double RY = 2.221;
-    static constexpr double RZ = 0.0;
+    // Default orientation (facing down) - loaded from config
+    double RX = 2.221;
+    double RY = 2.221;
+    double RZ = 0.0;
+
+    // Default positions - loaded from config
+    double default_x = -600.0;
+    double default_y = -100.0;
 
     SimplePickAndWeighNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
     : Node("simple_pick_and_weigh", options)
@@ -49,11 +55,14 @@ public:
         // Declare parameters
         this->declare_parameter("grip_weight", 100);
         this->declare_parameter("initial_positioning", false);
+        this->declare_parameter("config_path", "/home/joshc/mtrn4231_jakos/4231_scripts/robot_config.yaml");
+
         grip_weight_ = this->get_parameter("grip_weight").as_int();
         initial_positioning_ = this->get_parameter("initial_positioning").as_bool();
+        std::string config_path = this->get_parameter("config_path").as_string();
 
-        // Load config for weighting time
-        load_weight_config();
+        // Load config file
+        load_robot_config(config_path);
 
         // Use a reentrant callback group
         callback_group_ = this->create_callback_group(
@@ -62,11 +71,17 @@ public:
         init_clients();
         init_subscribers();
 
-        RCLCPP_INFO(this->get_logger(), "Simple Pick and Weigh Node initialized");
+        RCLCPP_INFO(this->get_logger(), "");
+        RCLCPP_INFO(this->get_logger(), "============================================================");
+        RCLCPP_INFO(this->get_logger(), "Simple Pick and Weigh Node Initialized");
+        RCLCPP_INFO(this->get_logger(), "============================================================");
         RCLCPP_INFO(this->get_logger(), "Grip weight: %dg", grip_weight_);
         RCLCPP_INFO(this->get_logger(), "Weighting time: %d seconds", weighting_time_);
         RCLCPP_INFO(this->get_logger(), "Initial positioning: %s", initial_positioning_ ? "enabled" : "disabled");
+        RCLCPP_INFO(this->get_logger(), "Config loaded from: %s", config_path.c_str());
+        RCLCPP_INFO(this->get_logger(), "============================================================");
         RCLCPP_INFO(this->get_logger(), "Waiting 2 seconds for all systems to be ready...");
+        RCLCPP_INFO(this->get_logger(), "");
 
         // Start sequence after 2 seconds using a one-shot timer
         start_timer_ = this->create_wall_timer(
@@ -76,62 +91,117 @@ public:
     }
 
 private:
-    void load_weight_config()
+    void load_robot_config(const std::string& config_path)
     {
-        // Default values
-        int default_time = 10;
-        int extended_time = 15;
-        int threshold = 100;
+        RCLCPP_INFO(this->get_logger(), "Loading robot configuration from: %s", config_path.c_str());
 
-        // Try to load config file
-        std::string config_path = "/home/joshc/mtrn4231_jakos/4231_scripts/weight_config.yaml";
         std::ifstream config_file(config_path);
+        if (!config_file.is_open()) {
+            RCLCPP_WARN(this->get_logger(), "Could not open config file, using defaults");
+            weighting_time_ = 10;
+            return;
+        }
 
-        if (config_file.is_open()) {
-            std::string line;
-            while (std::getline(config_file, line)) {
-                // Skip comments and empty lines
-                if (line.empty() || line[0] == '#') continue;
+        std::string line;
+        std::string current_section = "";
+        int default_weighting_time = 10;
 
-                // Parse simple key: value format
-                size_t colon_pos = line.find(':');
-                if (colon_pos != std::string::npos) {
-                    std::string key = line.substr(0, colon_pos);
-                    std::string value = line.substr(colon_pos + 1);
+        // Maps to store weight-specific configurations
+        std::map<int, int> weight_times;  // weight -> weighting_time
 
-                    // Trim whitespace
-                    key.erase(0, key.find_first_not_of(" \t"));
-                    key.erase(key.find_last_not_of(" \t") + 1);
-                    value.erase(0, value.find_first_not_of(" \t"));
-                    value.erase(value.find_last_not_of(" \t") + 1);
+        while (std::getline(config_file, line)) {
+            // Remove comments
+            size_t comment_pos = line.find('#');
+            if (comment_pos != std::string::npos) {
+                line = line.substr(0, comment_pos);
+            }
 
-                    try {
-                        if (key == "default_weighting_time") {
-                            default_time = std::stoi(value);
-                        } else if (key == "extended_weighting_time") {
-                            extended_time = std::stoi(value);
-                        } else if (key == "extended_time_threshold") {
-                            threshold = std::stoi(value);
-                        }
-                    } catch (...) {
-                        // Ignore parse errors, use defaults
+            // Trim whitespace
+            line.erase(0, line.find_first_not_of(" \t"));
+            line.erase(line.find_last_not_of(" \t") + 1);
+
+            // Skip empty lines
+            if (line.empty()) continue;
+
+            // Check if this is a section header (ends with :)
+            if (line.back() == ':') {
+                current_section = line.substr(0, line.length() - 1);
+                continue;
+            }
+
+            // Parse key: value pairs
+            size_t colon_pos = line.find(':');
+            if (colon_pos == std::string::npos) continue;
+
+            std::string key = line.substr(0, colon_pos);
+            std::string value = line.substr(colon_pos + 1);
+
+            // Trim key and value
+            key.erase(0, key.find_first_not_of(" \t"));
+            key.erase(key.find_last_not_of(" \t") + 1);
+            value.erase(0, value.find_first_not_of(" \t"));
+            value.erase(value.find_last_not_of(" \t") + 1);
+
+            try {
+                // Parse based on current section and key
+                if (current_section == "z_heights") {
+                    if (key == "home") Z_HOME = std::stod(value);
+                    else if (key == "descend") Z_DESCEND = std::stod(value);
+                    else if (key == "pickup") Z_PICKUP = std::stod(value);
+                    else if (key == "place") Z_PLACE = std::stod(value);
+                }
+                else if (current_section == "orientation") {
+                    if (key == "rx") RX = std::stod(value);
+                    else if (key == "ry") RY = std::stod(value);
+                    else if (key == "rz") RZ = std::stod(value);
+                }
+                else if (current_section == "positions") {
+                    if (key == "default_x") default_x = std::stod(value);
+                    else if (key == "default_y") default_y = std::stod(value);
+                }
+                else if (current_section == "weighting_defaults") {
+                    if (key == "default_time") default_weighting_time = std::stoi(value);
+                }
+                else if (current_section.find("weights") == 0) {
+                    // We're in the weights section
+                    // Check if key is a weight value (100, 200, 500)
+                    if (key == "100" || key == "200" || key == "500") {
+                        current_section = "weights/" + key;
                     }
                 }
+                else if (current_section.find("weights/") == 0) {
+                    // We're in a specific weight subsection
+                    std::string weight_str = current_section.substr(8); // Remove "weights/"
+                    int weight_val = std::stoi(weight_str);
+
+                    if (key == "weighting_time") {
+                        weight_times[weight_val] = std::stoi(value);
+                    }
+                }
+            } catch (const std::exception& e) {
+                RCLCPP_WARN(this->get_logger(), "Error parsing config line '%s': %s",
+                           line.c_str(), e.what());
             }
-            config_file.close();
-            RCLCPP_INFO(this->get_logger(), "Loaded weight config from: %s", config_path.c_str());
-        } else {
-            RCLCPP_WARN(this->get_logger(), "Could not load config file, using defaults");
         }
 
+        config_file.close();
+
         // Determine weighting time based on grip_weight
-        if (grip_weight_ >= threshold) {
-            weighting_time_ = extended_time;
-            RCLCPP_INFO(this->get_logger(), "Using extended weighting time (%ds) for grip_weight=%dg",
-                        extended_time, grip_weight_);
+        if (weight_times.find(grip_weight_) != weight_times.end()) {
+            weighting_time_ = weight_times[grip_weight_];
+            RCLCPP_INFO(this->get_logger(), "Using configured weighting time of %ds for %dg",
+                       weighting_time_, grip_weight_);
         } else {
-            weighting_time_ = default_time;
+            weighting_time_ = default_weighting_time;
+            RCLCPP_INFO(this->get_logger(), "Using default weighting time of %ds for %dg",
+                       weighting_time_, grip_weight_);
         }
+
+        // Log loaded configuration
+        RCLCPP_INFO(this->get_logger(), "Loaded config - Z_HOME: %.1f, Z_DESCEND: %.1f, Z_PICKUP: %.1f",
+                   Z_HOME, Z_DESCEND, Z_PICKUP);
+        RCLCPP_INFO(this->get_logger(), "Loaded config - Position: (%.1f, %.1f)", default_x, default_y);
+        RCLCPP_INFO(this->get_logger(), "Loaded config - Orientation: (%.3f, %.3f, %.3f)", RX, RY, RZ);
     }
 
     void init_clients()
@@ -328,10 +398,6 @@ private:
         RCLCPP_INFO(this->get_logger(), "STARTING SIMPLE PICK AND WEIGH");
         RCLCPP_INFO(this->get_logger(), "============================================================");
         RCLCPP_INFO(this->get_logger(), "");
-
-        double default_x = -600.0;
-        double default_y = -100.0;
-
         RCLCPP_INFO(this->get_logger(), "Using position: X=%.1f, Y=%.1f", default_x, default_y);
         RCLCPP_INFO(this->get_logger(), "");
 

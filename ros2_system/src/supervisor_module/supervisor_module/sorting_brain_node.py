@@ -76,9 +76,9 @@ class SortingBrainNode(Node):
 
     # Z heights (mm) - tool0 frame
     Z_HOME = 371.0
-    Z_DESCEND = 212.0
-    Z_PICKUP = 182.0
-    Z_PLACE = 182.0
+    Z_DESCEND = 210.0
+    Z_PICKUP = 180.0
+    Z_PLACE = 180.0
 
     # Default orientation (facing down)
     RX = 2.221

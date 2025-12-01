@@ -3,12 +3,15 @@
 # Real Mode (Real Robot + Real Perception + Real Weight) - Modular Launch
 #
 # Usage:
-#   ./runRealModular.sh [ROBOT_IP] [--autorun] [--step]
+#   ./runRealModular.sh [ROBOT_IP] [--autorun] [--step] [--sim-perception]
 #
 # Options:
-#   ROBOT_IP    Robot IP address (default: 192.168.0.100)
-#   --autorun   Automatically start sorting without dashboard
-#   --step      Pause before each node launch (for testing)
+#   ROBOT_IP           Robot IP address (default: 192.168.0.100)
+#   --autorun          Automatically start sorting without dashboard
+#   --step             Pause before each node launch (for testing)
+#   --sim-perception   Use simulated perception instead of real (for testing)
+#
+# Note: Position check is automatic when using simulated perception
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,6 +21,7 @@ ROS2_WS="${SCRIPT_DIR}/../ros2_system"
 ROBOT_IP="192.168.0.100"
 AUTORUN=false
 STEP_MODE=false
+SIM_PERCEPTION=false
 
 for arg in "$@"; do
     case $arg in
@@ -26,6 +30,9 @@ for arg in "$@"; do
             ;;
         --step|-s)
             STEP_MODE=true
+            ;;
+        --sim-perception|-p)
+            SIM_PERCEPTION=true
             ;;
         *)
             if [[ $arg =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -45,16 +52,24 @@ wait_for_enter() {
 echo "==========================================="
 echo "   Sorting System - REAL MODE (Modular)"
 echo "==========================================="
-echo "  Robot IP: $ROBOT_IP"
-echo "  Autorun:  $AUTORUN"
-echo "  Step:     $STEP_MODE"
+echo "  Robot IP:         $ROBOT_IP"
+echo "  Autorun:          $AUTORUN"
+echo "  Step:             $STEP_MODE"
+echo "  Sim Perception:   $SIM_PERCEPTION"
 echo "==========================================="
+if [ "$SIM_PERCEPTION" = true ]; then
+    echo "Note: Position check will run automatically with simulated perception"
+fi
 echo ""
 echo "PREREQUISITES:"
 echo "  [✓] Robot powered on and booted"
-echo "  [✓] Kevin's perception nodes running"
+if [ "$SIM_PERCEPTION" = false ]; then
+    echo "  [✓] Kevin's perception nodes running"
+    echo "  [✓] Camera calibrated and connected"
+else
+    echo "  [✓] Simulated perception will be launched"
+fi
 echo "  [✓] Workspace clear of obstacles"
-echo "  [✓] Camera calibrated and connected"
 echo ""
 read -p "All prerequisites met? Press Enter to continue or Ctrl+C to cancel..."
 
@@ -95,7 +110,6 @@ wait_for_enter
 ros2 launch ur_robot_driver ur_control.launch.py \
     ur_type:=ur5e \
     robot_ip:=$ROBOT_IP \
-    initial_joint_controller:=scaled_joint_trajectory_controller \
     use_fake_hardware:=false \
     launch_rviz:=false \
     description_file:=ur5e_with_end_effector.urdf.xacro \
@@ -144,11 +158,24 @@ python3 "${ROS2_WS}/install/motion_control_module/share/motion_control_module/sc
 SAFETY_PID=$!
 sleep 2
 
-# 5. Real Perception (Kevin's nodes should be running externally)
-echo "[5/9] NOTE: Expecting Kevin's perception nodes to be running externally!"
-echo "           Checking for /detected_objects topic..."
-timeout 5 ros2 topic echo /detected_objects --once 2>/dev/null && echo "Perception topic found!" || echo "Warning: /detected_objects not publishing yet"
-sleep 2
+# 5. Perception
+PERCEPTION_PID=""
+if [ "$SIM_PERCEPTION" = true ]; then
+    echo "[5/9] Starting Simulated Perception..."
+    wait_for_enter
+    ros2 run supervisor_module simulated_perception_node \
+        --ros-args \
+        -p num_objects:=4 \
+        -p publish_rate:=5.0 \
+        -p randomize_positions:=true &
+    PERCEPTION_PID=$!
+    sleep 2
+else
+    echo "[5/9] NOTE: Expecting Kevin's perception nodes to be running externally!"
+    echo "           Checking for /detected_objects topic..."
+    timeout 5 ros2 topic echo /detected_objects --once 2>/dev/null && echo "Perception topic found!" || echo "Warning: /detected_objects not publishing yet"
+    sleep 2
+fi
 
 # 6. Weight Detection (Real)
 echo "[6/9] Starting Real Weight Detection..."
@@ -187,6 +214,34 @@ ros2 run motion_control_module cartesian_controller_node \
 CARTESIAN_PID=$!
 sleep 3
 
+# Position Check (automatic when using simulated perception)
+if [ "$SIM_PERCEPTION" = true ]; then
+    echo ""
+    echo "=========================================="
+    echo "   SIMULATED PERCEPTION POSITION CHECK"
+    echo "=========================================="
+    echo ""
+    echo "Running position check for simulated weights..."
+    echo "The robot will visit each simulated weight position at Z_PICKUP."
+    echo ""
+    python3 "${ROS2_WS}/src/motion_control_module/scripts/check_simulated_positions.py"
+
+    if [ $? -eq 0 ]; then
+        echo ""
+        echo "Position check completed successfully!"
+        echo ""
+    else
+        echo ""
+        echo "Position check failed or was cancelled!"
+        read -p "Continue anyway? (y/n): " continue_response
+        if [[ ! $continue_response =~ ^[Yy]$ ]]; then
+            echo "Stopping..."
+            kill $UR_PID $MOVEIT_PID $GRIPPER_PID $CARTESIAN_PID $SAFETY_PID $WEIGHT_PID $SORTING_PID $PERCEPTION_PID $PLOT_PID 2>/dev/null || true
+            exit 1
+        fi
+    fi
+fi
+
 # 9. Sorting Brain
 echo "[9/9] Starting Sorting Brain..."
 wait_for_enter
@@ -217,5 +272,5 @@ wait -n
 
 echo ""
 echo "Shutting down..."
-kill $UR_PID $MOVEIT_PID $GRIPPER_PID $CARTESIAN_PID $SAFETY_PID $WEIGHT_PID $SORTING_PID $PLOT_PID 2>/dev/null || true
+kill $UR_PID $MOVEIT_PID $GRIPPER_PID $CARTESIAN_PID $SAFETY_PID $WEIGHT_PID $SORTING_PID $PERCEPTION_PID $PLOT_PID 2>/dev/null || true
 echo "Done."
