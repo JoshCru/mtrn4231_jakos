@@ -24,7 +24,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'weight_detector = weight_detection_module.weight_detector:main',
+            'weight_detector_py = weight_detection_module.weight_detector_py:main',
         ],
     },
 )

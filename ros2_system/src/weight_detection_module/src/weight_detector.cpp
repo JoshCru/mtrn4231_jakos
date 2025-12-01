@@ -16,7 +16,7 @@
 class KalmanFilter
 {
 public:
-    KalmanFilter(double process_variance = 0.001, double measurement_variance = 0.15)
+    KalmanFilter(double process_variance = 0.0001, double measurement_variance = 1)
         : process_variance_(process_variance),
           measurement_variance_(measurement_variance),
           estimate_(0.0),
@@ -192,7 +192,7 @@ public:
         use_snapping_ = this->get_parameter("useSnapping").as_bool();
 
         // Exponential calibration parameters
-        exp_amplitude_light_ = 15;
+        exp_amplitude_light_ = 9;
         exp_amplitude_heavy_ = 8.45;
         decay_light_ = 5.75;
         decay_heavy_ = 2.95;
@@ -204,24 +204,22 @@ public:
         min_threshold_ /= calibration_factor_;
 
         // Polynomial calibration parameters
-        this->declare_parameter("poly_coeff_a", 0.0);     // cubic term (unused)
-        this->declare_parameter("poly_coeff_b", -0.1463); // quadratic term
-        this->declare_parameter("poly_coeff_c", 19.55);   // linear term
-        this->declare_parameter("poly_coeff_d", -152.7);  // constant term
+        this->declare_parameter("poly_coeff_a", -0.1612); // quadratic term
+        this->declare_parameter("poly_coeff_b", 20.75);   // linear term
+        this->declare_parameter("poly_coeff_c", -152.7);  // constant term
 
         poly_coeff_a_ = this->get_parameter("poly_coeff_a").as_double();
         poly_coeff_b_ = this->get_parameter("poly_coeff_b").as_double();
         poly_coeff_c_ = this->get_parameter("poly_coeff_c").as_double();
-        poly_coeff_d_ = this->get_parameter("poly_coeff_d").as_double();
 
         // Weight set for snapping
-        weight_set_ = {50, 100, 200, 500};
+        weight_set_ = {0, 50, 100, 200, 500};
 
         // Kalman filters (6 joints)
         for (int i = 0; i < 6; ++i)
         {
             double process_variance = 0.0005;
-            double measurement_variance = 15;
+            double measurement_variance = 25;
             kalman_filters_.emplace_back(process_variance, measurement_variance);
         }
 
@@ -270,6 +268,7 @@ private:
     void updateParameters()
     {
         active_joints_ = this->get_parameter("active_joints").as_integer_array();
+        use_snapping_ = this->get_parameter("useSnapping").as_bool();
     }
 
     void calibrateBaselineCallback(
@@ -435,52 +434,27 @@ private:
         RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                               "Raw mass: %.4f grams", raw_grams);
 
+        // Polynomial calibration mode + round to nearest gram (optionally snapping)
+        double calibrated_grams = 0.0;
+        double min_threshold_grams_ = min_threshold_ * 1000.0;
+
+        if (raw_grams >= min_threshold_grams_)
+        {
+            calibrated_grams = poly_coeff_a_ * raw_grams * raw_grams + poly_coeff_b_ * raw_grams + poly_coeff_c_;
+        }
+
+        estimated_mass_grams_ = std::max(0.0, calibrated_grams);
+        estimated_mass_grams_ = std::round(estimated_mass_grams_);
         if (use_snapping_)
         {
-            // Exponential calibration mode + snap to weight set (0, 50, 100, 200, 500)
-            if (raw_mass < min_threshold_)
-            {
-                calibration_factor_ = 0.0;
-            }
-            else if (raw_mass < mass_threshold_)
-            {
-                calibration_factor_ = exp_amplitude_light_ * std::exp(-decay_light_ * raw_mass);
-            }
-            else
-            {
-                calibration_factor_ = exp_amplitude_heavy_ * std::exp(-decay_heavy_ * raw_mass);
-            }
-
-            estimated_mass_grams_ = raw_mass * calibration_factor_ * 1000.0;
-            estimated_mass_grams_ = std::round(estimated_mass_grams_ / 5.0) * 5.0;
-
             output_mass = snapToWeightSet(estimated_mass_grams_);
         }
         else
         {
-            // Polynomial calibration mode + round to nearest 5g (no snapping)
-            double calibrated_grams = 0.0;
-            double min_threshold_grams_ = min_threshold_ * 1000.0;
-
-            if (raw_grams >= min_threshold_grams_)
-            {
-                if (raw_grams > 80.0)
-                {
-                    // Linear extrapolation for high values (during transients)
-                    // Use gradient from 500g region
-                    calibrated_grams = 500.0 + (raw_grams - 68.4) * 4.0;
-                }
-                else
-                {
-                    calibrated_grams = poly_coeff_b_ * raw_grams * raw_grams + poly_coeff_c_ * raw_grams + poly_coeff_d_;
-                }
-            }
-
-            estimated_mass_grams_ = std::max(0.0, calibrated_grams);
-            estimated_mass_grams_ = std::round(estimated_mass_grams_ / 5.0) * 5.0;
-
             output_mass = static_cast<int>(estimated_mass_grams_);
         }
+
+        // RCLCPP_INFO(this->get_logger(), "DEBUG: raw_grams=%.2f, estimated_mass=%.2f", raw_grams, estimated_mass_grams_);
 
         auto mass_msg = std_msgs::msg::Int32();
         mass_msg.data = output_mass;
@@ -489,20 +463,15 @@ private:
 
     int snapToWeightSet(double estimated_mass)
     {
-        // Range-based snapping
         if (estimated_mass <= 17.5)
         {
             return 0;
         }
-        else if (estimated_mass <= 45)
-        {
-            return 50;
-        }
-        else if (estimated_mass <= 185)
+        else if (estimated_mass <= 135)
         {
             return 100;
         }
-        else if (estimated_mass <= 375)
+        else if (estimated_mass <= 325)
         {
             return 200;
         }
@@ -595,7 +564,6 @@ private:
     double poly_coeff_a_;
     double poly_coeff_b_;
     double poly_coeff_c_;
-    double poly_coeff_d_;
 
     int baseline_sample_size_;
 

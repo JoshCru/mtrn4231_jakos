@@ -32,7 +32,7 @@ Requires Universal Robots' `ur_robot_driver`.
 ### Parameters
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `useSnapping` | `false` | When `true`, snaps output to discrete weights (0, 50, 100, 200, 500g). When `false`, outputs continuous values rounded to nearest 5g. |
+| `useSnapping` | `false` | When `true`, snaps output to discrete weights (0, 100, 200, 500g) for improved accuracy within the test weight set. When `false`, outputs continuous values rounded to the nearest gram, offering more continuous results but requiring longer to settle. |
 
 ## How It Works
 
@@ -43,12 +43,13 @@ Current Joint Torques → Kalman Filter → Torque Deltas → Kinematics → Mas
 ```
 
 1. **Decimation**: Joint state messages arrive at ~500Hz; the node decimates to ~50Hz to reduce processing load / high frequency noise.
-2. **Baseline Calibration**: On startup (or when triggered via service), the node collects ~5 seconds of torque samples to establish a baseline with the gripper empty.
+2. **Baseline Torque Calibration**: On startup (or when triggered via service), the node collects ~5 seconds of torque samples to establish a baseline with the gripper empty.
 3. **Torque Filtering**: Incoming joint torques are smoothed using per-joint Kalman filters.
 4. **Mass Estimation**: The difference between current and baseline torques is used with UR5e forward kinematics to compute moment arms, then mass is estimated via $\tau = m \times g \times r$.
-5. **Output Calibration**:
-   - **Snapping ON** (`useSnapping: true`): Uses exponential calibration curves and snaps to the nearest weight class {0, 50, 100, 200, 500}g.
-   - **Snapping OFF** (`useSnapping: false`): Uses polynomial calibration for more accurate continuous output, rounded to the nearest 5g.
+5. **Output Estimate Calibration**:
+   The system now uses a polynomial gain factor of $ax^2 + bx + c$ to calibrate estimates.
+   - **Snapping ON** (`useSnapping: true`): Estimates are generously snapped to discrete weight classes {0, 100, 200, 500}g, optimised for accuracy within the defined test weight set.
+   - **Snapping OFF** (`useSnapping: false`): Provides continuous mass estimates, rounded to the nearest gram. This offers smoother results but may require more time to settle.
 
 ## Usage
 1. **Initiate Calibration**: Go to a fixed height above the target pickup point and invoke the `/weight_detection/calibrate_baseline` service.
@@ -80,6 +81,8 @@ If needed, test scripts are available in the format `test_{ROS_NODE_LANGUAGE}_{M
 
 The test processes data from a pre-recorded ROS bags found in the [rosbags2 directory.](../../../rosbags2/)
 
+Comparison scripts, such as `test_cpp_100_snap_comp.sh`, run both snapping and non-snapping variants of the C++ node simultaneously, publishing to `/estimated_mass_snapped` and `/estimated_mass_unsnapped` respectively, for direct comparison.
+
 ### Visualisation
 
 Use **PlotJuggler** to monitor the estimated mass topic in real-time:
@@ -100,7 +103,7 @@ We recommend changing the Buffer size (top left, under "Streaming") to **90 seco
 #### Alternative: Python Node
 **WARNING**: Only intended for visualisation of torque filtering on all 6 robot joints as this uses an outdated estimator.
 ```bash
-ros2 run weight_detection_module weight_detector_py.py
+ros2 run weight_detection_module weight_detector_py
 ```
 
 ## Limitations and Assumptions
