@@ -79,4 +79,5 @@ if [ "$AUTORUN" = true ]; then
 fi
 
 # Launch using the unified launch file
-ros2 launch full_system.launch.py $LAUNCH_ARGS
+cd "${ROS2_WS}"
+ros2 launch launch/full_system.launch.py $LAUNCH_ARGS

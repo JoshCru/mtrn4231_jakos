@@ -35,4 +35,5 @@ export FASTRTPS_DEFAULT_PROFILES_FILE=/tmp/fastdds_profile.xml
 export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 
 # Launch using the unified launch file
-ros2 launch full_system.launch.py mode:=simulation
+cd "${ROS2_WS}"
+ros2 launch launch/full_system.launch.py mode:=simulation
