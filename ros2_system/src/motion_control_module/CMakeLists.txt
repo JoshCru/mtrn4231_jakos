@@ -52,6 +52,12 @@ install(PROGRAMS
   RENAME go_home
 )
 
+install(PROGRAMS
+  scripts/simple_pick_and_weigh.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME simple_pick_and_weigh
+)
+
 # Install launch files, config, urdf, scripts, srdf, and meshes
 install(DIRECTORY
   launch
