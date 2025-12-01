@@ -22,8 +22,10 @@ sudo apt install -y \
     ros-humble-ur-robot-driver \
     ros-humble-ur-moveit-config \
     ros-humble-ur-description \  
+    ros-humble-plotjuggler-ros \
     libopencv-dev \
-    libpcl-dev \    
+    libpcl-dev \
+    libeigen3-dev \
     python3-numpy \
     python3-matplotlib
 ```
