@@ -5,12 +5,13 @@ import cv2
 import tf2_ros
 import numpy as np
 import pyrealsense2 as rs
-from ultralytics import YOLO
 
+from ultralytics import YOLO
 from cv_bridge import CvBridge, CvBridgeError
 from rclpy.node import Node
 from rclpy.time import Time
 from sensor_msgs.msg import Image, CameraInfo
+from std_msgs.msg import String
 from geometry_msgs.msg import TransformStamped
 from geometry_msgs.msg import PointStamped
 from tf2_geometry_msgs import do_transform_point
@@ -80,6 +81,20 @@ class YOLObjectDetect(Node):
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
+
+        # ---------- Publishers for other nodes ----------
+        # 3D position in base_link (meters)
+        self.coord_pub = self.create_publisher(
+            PointStamped,
+            'object_coords',
+            10
+        )
+        # Metadata: class, conf, estimated weight as a string
+        self.info_pub = self.create_publisher(
+            String,
+            'object_weight',
+            10
+        )
 
         # ---------- Load YOLO ----------
         self.get_logger().info(f'Loading YOLO weights: {weights_path}')
@@ -225,6 +240,10 @@ class YOLObjectDetect(Node):
         Estimate cylinder height in meters using depth.
         We sample one point slightly below the top of the bbox for the object,
         and one point below the bottom of the bbox for the table.
+
+        Returns:
+            None if estimation fails
+            OR (height_m, (u_top, v_top), (u_table, v_table))
         """
         if self.depth_image is None:
             return None
@@ -254,10 +273,13 @@ class YOLObjectDetect(Node):
 
         # sanity check
         if height_m <= 0.0 or height_m > 0.5:  # 0.5 m upper bound just to catch nonsense
-            self.get_logger().warn(f"Height estimation suspicious: {height_m:.3f} m")
+            self.get_logger().warn(
+                f"Height estimation suspicious: {height_m:.3f} m "
+                f"(top_depth={depth_top:.3f} m, table_depth={depth_table:.3f} m)"
+            )
             return None
 
-        return height_m
+        return height_m, (u_center, v_top), (u_center, v_table)
 
     def estimate_weight_from_height(self, height_m):
         """
@@ -381,9 +403,13 @@ class YOLObjectDetect(Node):
             u, v, r_px = self.refine_center_with_circle(img, x1, y1, x2, y2)
                 
             # ---- Estimate cylinder height & weight from depth (before TF) ----
-            height_m = self.estimate_height_m(x1, y1, x2, y2)
+            height_result = self.estimate_height_m(x1, y1, x2, y2)
             weight_label = None
-            if height_m is not None:
+            top_px = None
+            table_px = None
+
+            if height_result is not None:
+                height_m, top_px, table_px = height_result
                 weight_label = self.estimate_weight_from_height(height_m)
                 self.get_logger().info(
                     f"Estimated height: {height_m*1000.0:.1f} mm, "
@@ -444,6 +470,25 @@ class YOLObjectDetect(Node):
                     f"UR Base (mm): X={x_mm:.2f}, Y={y_mm:.2f}, Z={z_mm:.2f}"
                 )
 
+                # -------- Publish to other nodes --------
+                # 1) 3D point in base_link (meters)
+                pt_msg = PointStamped()
+                pt_msg.header.stamp = self.get_clock().now().to_msg()
+                pt_msg.header.frame_id = "base_link"
+                pt_msg.point.x = float(x_b)
+                pt_msg.point.y = float(y_b)
+                pt_msg.point.z = float(z_b)
+                self.coord_pub.publish(pt_msg)
+
+                # 2) Info string: class, conf, estimated weight
+                info = String()
+                # Example format: "red_object,0.87,200 g"
+                if weight_label is not None:
+                    info.data = f"{cls_name},{conf:.2f},{weight_label}"
+                else:
+                    info.data = f"{cls_name},{conf:.2f},unknown"
+                self.info_pub.publish(info)
+
                 # Publish TF in base frame
                 t_out = TransformStamped()
                 t_out.header.stamp = self.get_clock().now().to_msg()
@@ -462,12 +507,11 @@ class YOLObjectDetect(Node):
                 self.get_logger().warn(f"TF transform failed: {ex}")
                 continue
 
-
             # ---- Draw BLUE bounding box + circle ----
             cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 1) #Bounding Box
-            cv2.circle(img, (u, v), 4, (255, 0, 0), -1) #Centorid Circle
-            
-            # draw circle showing the fitted top of the cylinder (if radius > 0)
+            cv2.circle(img, (u, v), 4, (255, 0, 0), -1) #Red centre dot
+
+            # Draw circle showing the fitted top of the cylinder (if radius > 0)
             if r_px > 0:
                 cv2.circle(img, (u, v), r_px, (0, 255, 0), 2)
 
@@ -488,7 +532,32 @@ class YOLObjectDetect(Node):
 
         if self.debug_view:
             cv2.imshow("YOLO Detection", img)
-            cv2.waitKey(1)
+
+            # Optional separate view just for the sampling pixels
+            height_debug = np.zeros_like(img)
+            for (px, label, color) in [
+                (top_px, "TOP", (0, 0, 255)),
+                (table_px, "TABLE", (255, 0, 255)),
+            ]:
+                if px is not None:
+                    cv2.circle(height_debug, px, 5, color, -1)
+                    cv2.putText(
+                        height_debug,
+                        label,
+                        (px[0] + 5, px[1] - 5),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6,
+                        color,
+                        1,
+                    )
+
+            cv2.imshow("Height Sampling Pixels", height_debug)
+            key = cv2.waitKey(1) & 0xFF   # get key pressed (if any)
+
+            if key == ord('q'):
+                self.get_logger().info("q pressed, shutting down node.")
+                rclpy.shutdown()
+                cv2.destroyAllWindows()
 
 def main():
     rclpy.init()
