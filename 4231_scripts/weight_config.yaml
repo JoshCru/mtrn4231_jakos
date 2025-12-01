@@ -1,0 +1,12 @@
+# Weight Configuration
+# Controls weighting time based on grip_weight parameter
+
+# Default weighting time in seconds
+default_weighting_time: 10
+
+# Extended weighting time for 100g grip_weight (in seconds)
+# 100g typically indicates heavier objects that need more stabilization time
+extended_weighting_time: 15
+
+# Grip weight threshold to use extended time
+extended_time_threshold: 100

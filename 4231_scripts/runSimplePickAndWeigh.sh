@@ -157,8 +157,15 @@ if [ "$USE_FAKE_HARDWARE" = true ]; then
     ros2 run weight_detection_module weight_detector &
     WEIGHT_PID=$!
     sleep 2
+
+    # Launch PlotJuggler for weight visualization (after weight detector starts)
+    echo "Starting PlotJuggler for weight visualization..."
+    "${ROS2_WS}/plot_weight.sh" &
+    PLOT_PID=$!
+    sleep 2
 else
     echo "[6/7] Skipping Weight Detection (fake hardware - no real weight sensor)"
+    PLOT_PID=""
 fi
 
 # 7. Gripper Controller
@@ -193,10 +200,11 @@ echo ""
 echo "Now running simple pick and weigh (C++ version)..."
 echo ""
 
-# Run the C++ simple pick and weigh node
+# Run the C++ simple pick and weigh node with initial positioning enabled
 ros2 run motion_control_module simple_pick_and_weigh_node \
     --ros-args \
-    -p grip_weight:=${GRIP_WEIGHT}
+    -p grip_weight:=${GRIP_WEIGHT} \
+    -p initial_positioning:=true
 
 echo ""
 echo "Pick and weigh complete!"
@@ -208,5 +216,5 @@ wait -n
 
 echo ""
 echo "Shutting down..."
-kill $UR_PID $MOVEIT_PID $GRIPPER_PID $CARTESIAN_PID $SAFETY_PID $WEIGHT_PID $PERCEPTION_PID 2>/dev/null || true
+kill $UR_PID $MOVEIT_PID $GRIPPER_PID $CARTESIAN_PID $SAFETY_PID $WEIGHT_PID $PERCEPTION_PID $PLOT_PID 2>/dev/null || true
 echo "Done."

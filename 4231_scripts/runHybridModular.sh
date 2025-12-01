@@ -132,8 +132,15 @@ if [ "$REAL_WEIGHT" = true ]; then
     ros2 run weight_detection_module weight_detector &
     WEIGHT_PID=$!
     sleep 2
+
+    # Launch PlotJuggler for weight visualization (after weight detector starts)
+    echo "Starting PlotJuggler for weight visualization..."
+    "${ROS2_WS}/plot_weight.sh" &
+    PLOT_PID=$!
+    sleep 2
 else
     echo "[6/8] Skipping Weight Detection (using simulated weights)"
+    PLOT_PID=""
 fi
 
 # 7. Gripper Controller
@@ -190,5 +197,5 @@ wait -n
 
 echo ""
 echo "Shutting down..."
-kill $UR_PID $MOVEIT_PID $GRIPPER_PID $CARTESIAN_PID $SAFETY_PID $PERCEPTION_PID $SORTING_PID $WEIGHT_PID 2>/dev/null || true
+kill $UR_PID $MOVEIT_PID $GRIPPER_PID $CARTESIAN_PID $SAFETY_PID $PERCEPTION_PID $SORTING_PID $WEIGHT_PID $PLOT_PID 2>/dev/null || true
 echo "Done."

@@ -24,6 +24,8 @@
 #include <thread>
 #include <mutex>
 #include <memory>
+#include <fstream>
+#include <iostream>
 
 namespace motion_control_module
 {
@@ -46,7 +48,12 @@ public:
     {
         // Declare parameters
         this->declare_parameter("grip_weight", 100);
+        this->declare_parameter("initial_positioning", false);
         grip_weight_ = this->get_parameter("grip_weight").as_int();
+        initial_positioning_ = this->get_parameter("initial_positioning").as_bool();
+
+        // Load config for weighting time
+        load_weight_config();
 
         // Use a reentrant callback group
         callback_group_ = this->create_callback_group(
@@ -57,6 +64,8 @@ public:
 
         RCLCPP_INFO(this->get_logger(), "Simple Pick and Weigh Node initialized");
         RCLCPP_INFO(this->get_logger(), "Grip weight: %dg", grip_weight_);
+        RCLCPP_INFO(this->get_logger(), "Weighting time: %d seconds", weighting_time_);
+        RCLCPP_INFO(this->get_logger(), "Initial positioning: %s", initial_positioning_ ? "enabled" : "disabled");
         RCLCPP_INFO(this->get_logger(), "Waiting 2 seconds for all systems to be ready...");
 
         // Start sequence after 2 seconds using a one-shot timer
@@ -67,6 +76,64 @@ public:
     }
 
 private:
+    void load_weight_config()
+    {
+        // Default values
+        int default_time = 10;
+        int extended_time = 15;
+        int threshold = 100;
+
+        // Try to load config file
+        std::string config_path = "/home/joshc/mtrn4231_jakos/4231_scripts/weight_config.yaml";
+        std::ifstream config_file(config_path);
+
+        if (config_file.is_open()) {
+            std::string line;
+            while (std::getline(config_file, line)) {
+                // Skip comments and empty lines
+                if (line.empty() || line[0] == '#') continue;
+
+                // Parse simple key: value format
+                size_t colon_pos = line.find(':');
+                if (colon_pos != std::string::npos) {
+                    std::string key = line.substr(0, colon_pos);
+                    std::string value = line.substr(colon_pos + 1);
+
+                    // Trim whitespace
+                    key.erase(0, key.find_first_not_of(" \t"));
+                    key.erase(key.find_last_not_of(" \t") + 1);
+                    value.erase(0, value.find_first_not_of(" \t"));
+                    value.erase(value.find_last_not_of(" \t") + 1);
+
+                    try {
+                        if (key == "default_weighting_time") {
+                            default_time = std::stoi(value);
+                        } else if (key == "extended_weighting_time") {
+                            extended_time = std::stoi(value);
+                        } else if (key == "extended_time_threshold") {
+                            threshold = std::stoi(value);
+                        }
+                    } catch (...) {
+                        // Ignore parse errors, use defaults
+                    }
+                }
+            }
+            config_file.close();
+            RCLCPP_INFO(this->get_logger(), "Loaded weight config from: %s", config_path.c_str());
+        } else {
+            RCLCPP_WARN(this->get_logger(), "Could not load config file, using defaults");
+        }
+
+        // Determine weighting time based on grip_weight
+        if (grip_weight_ >= threshold) {
+            weighting_time_ = extended_time;
+            RCLCPP_INFO(this->get_logger(), "Using extended weighting time (%ds) for grip_weight=%dg",
+                        extended_time, grip_weight_);
+        } else {
+            weighting_time_ = default_time;
+        }
+    }
+
     void init_clients()
     {
         // Motion control
@@ -269,6 +336,36 @@ private:
         RCLCPP_INFO(this->get_logger(), "");
 
         try {
+            // Initial positioning step (if enabled)
+            if (initial_positioning_) {
+                RCLCPP_INFO(this->get_logger(), "[INITIAL] Opening gripper for positioning check...");
+                if (!gripper_control("W")) {
+                    RCLCPP_WARN(this->get_logger(), "Failed to open gripper (continuing anyway)");
+                }
+                std::this_thread::sleep_for(std::chrono::seconds(2));
+                RCLCPP_INFO(this->get_logger(), "");
+
+                RCLCPP_INFO(this->get_logger(), "[INITIAL] Descending to Z_PICKUP for positioning check...");
+                if (!move_to(default_x, default_y, Z_PICKUP)) {
+                    RCLCPP_ERROR(this->get_logger(), "Failed to descend to Z_PICKUP");
+                    return;
+                }
+                RCLCPP_INFO(this->get_logger(), "");
+
+                RCLCPP_INFO(this->get_logger(), "*** POSITION CHECK ***");
+                RCLCPP_INFO(this->get_logger(), "Robot is now at Z_PICKUP with gripper open.");
+                RCLCPP_INFO(this->get_logger(), "Check the position and placement of the weight.");
+                std::cout << "Press Enter to continue with the full procedure..." << std::flush;
+                std::cin.get();
+                RCLCPP_INFO(this->get_logger(), "");
+
+                RCLCPP_INFO(this->get_logger(), "[INITIAL] Lifting back to Z_HOME (safe height)...");
+                if (!move_to(default_x, default_y, Z_HOME)) {
+                    RCLCPP_ERROR(this->get_logger(), "Failed to lift to Z_HOME");
+                    return;
+                }
+                RCLCPP_INFO(this->get_logger(), "");
+            }
             // Step 1: Move to Z_DESCEND
             RCLCPP_INFO(this->get_logger(), "[1/10] Moving to Z_DESCEND (calibration height)...");
             if (!move_to(default_x, default_y, Z_DESCEND)) {
@@ -334,8 +431,8 @@ private:
             RCLCPP_INFO(this->get_logger(), "");
 
             // Step 9: Wait for weight to stabilize
-            RCLCPP_INFO(this->get_logger(), "[9/10] Waiting 10 seconds for weight to stabilize...");
-            for (int i = 10; i > 0; i--) {
+            RCLCPP_INFO(this->get_logger(), "[9/10] Waiting %d seconds for weight to stabilize...", weighting_time_);
+            for (int i = weighting_time_; i > 0; i--) {
                 RCLCPP_INFO(this->get_logger(), "    %d seconds remaining...", i);
                 std::this_thread::sleep_for(std::chrono::seconds(1));
             }
@@ -373,6 +470,8 @@ private:
 
     // Member variables
     int grip_weight_;
+    int weighting_time_ = 10;
+    bool initial_positioning_ = false;
     rclcpp::CallbackGroup::SharedPtr callback_group_;
     rclcpp::TimerBase::SharedPtr start_timer_;
 

@@ -157,6 +157,12 @@ ros2 run weight_detection_module weight_detector &
 WEIGHT_PID=$!
 sleep 3
 
+# Launch PlotJuggler for weight visualization (after weight detector starts)
+echo "Starting PlotJuggler for weight visualization..."
+"${ROS2_WS}/plot_weight.sh" &
+PLOT_PID=$!
+sleep 2
+
 # 7. Gripper Controller
 echo "[7/9] Starting Gripper Controller..."
 wait_for_enter
@@ -211,5 +217,5 @@ wait -n
 
 echo ""
 echo "Shutting down..."
-kill $UR_PID $MOVEIT_PID $GRIPPER_PID $CARTESIAN_PID $SAFETY_PID $WEIGHT_PID $SORTING_PID 2>/dev/null || true
+kill $UR_PID $MOVEIT_PID $GRIPPER_PID $CARTESIAN_PID $SAFETY_PID $WEIGHT_PID $SORTING_PID $PLOT_PID 2>/dev/null || true
 echo "Done."
