@@ -19,6 +19,9 @@ sudo apt install -y \
     ros-humble-pcl-ros \
     ros-humble-rclcpp-lifecycle \
     ros-humble-rclcpp-action \
+    ros-humble-ur-robot-driver \
+    ros-humble-ur-moveit-config \
+    ros-humble-ur-description \  
     libopencv-dev \
     libpcl-dev \    
     python3-numpy \
