@@ -51,6 +51,9 @@ cleanup() {
     echo -e "\n${RED}Stopping all nodes...${NC}"
     kill $PY_PID 2>/dev/null
     kill $CPP_PID 2>/dev/null
+    # Force kill the actual binaries
+    pkill -f "weight_detection_module/weight_detector" 2>/dev/null
+    pkill -f "weight_detector_py" 2>/dev/null
     echo -e "${GREEN}Done!${NC}"
 }
 

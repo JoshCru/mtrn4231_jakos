@@ -43,6 +43,8 @@ ros2 bag play ../rosbags2/rosbag2_200_3cm_lift
 cleanup() {
     echo -e "\n${RED}Stopping C++ node...${NC}"
     kill $CPP_PID 2>/dev/null
+    # Force kill the actual binary in case ros2 run didn't propagate the signal
+    pkill -f "weight_detection_module/weight_detector" 2>/dev/null
     echo -e "${GREEN}Done!${NC}"
 }
 
