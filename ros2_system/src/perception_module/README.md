@@ -1,5 +1,4 @@
-# Perception Module – YOLO + RealSense Depth + UR5e Coordinate Projection  
-**University of New South Wales – MTRN4231 Robotics Project**
+# Perception Module  
 
 This package performs real-time object detection of **red cylindrical weights** using YOLOv8, extracts **precise 3D coordinates** using Intel RealSense depth data, and transforms those coordinates into the **UR5e robot's base frame**.  
 It also performs **height-based weight estimation** and publishes both the coordinates and the estimated weight to other ROS2 nodes.
@@ -232,3 +231,4 @@ UNSW Sydney – MTRN4231 Robotics Project
 Perception & Computer Vision Lead
 
 ---
+
