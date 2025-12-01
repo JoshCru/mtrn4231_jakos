@@ -43,8 +43,8 @@ sleep 2
 
 # Step 4: Play rosbag
 echo -e "\n${GREEN}[4/4] Playing rosbag...${NC}"
-echo -e "${BLUE}Bag: rosbag2_200_3cm_lift${NC}"
-ros2 bag play ../../../rosbags2/rosbag2_200_3cm_lift
+echo -e "${BLUE}Bag: rosbag2_100_3cm_lift${NC}"
+ros2 bag play ../rosbags2/rosbag2_100_3cm_lift
 
 # Cleanup function
 cleanup() {

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Test script for C++ weight detection node with 200g rosbag
+# Test script for C++ weight detection node with 100g rosbag
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 cd "$(dirname "$0")"
 
 echo -e "${BLUE}======================================${NC}"
-echo -e "${BLUE}C++ Weight Detection Test - 200g${NC}"
+echo -e "${BLUE}C++ Weight Detection Test - 100g${NC}"
 echo -e "${BLUE}======================================${NC}"
 
 # Step 1: Build the package
@@ -36,8 +36,8 @@ sleep 2
 
 # Step 4: Play rosbag
 echo -e "\n${GREEN}[4/4] Playing rosbag...${NC}"
-echo -e "${BLUE}Bag: rosbag2_200_3cm_lift${NC}"
-ros2 bag play ../../../rosbags2/rosbag2_200_3cm_lift
+echo -e "${BLUE}Bag: rosbag2_100_3cm_lift${NC}"
+ros2 bag play ../rosbags2/rosbag2_100_3cm_lift
 
 # Cleanup function
 cleanup() {
