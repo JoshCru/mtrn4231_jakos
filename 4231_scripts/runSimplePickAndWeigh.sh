@@ -109,18 +109,6 @@ sleep 10
 echo "Checking controllers..."
 ros2 control list_controllers
 
-if [ "$USE_FAKE_HARDWARE" = false ]; then
-    echo ""
-    echo "*** IMPORTANT: Now load ros.urp on the UR5e teach pendant ***"
-    echo "*** Connect to 192.168.0.77:50002 ***"
-    read -p "Press Enter after connecting the robot..."
-    echo ""
-else
-    echo ""
-    echo "*** SIMULATION MODE: Skipping robot connection prompt ***"
-    echo ""
-fi
-
 # 2. MoveIt
 echo "[2/7] Starting MoveIt with RViz..."
 wait_for_enter
@@ -136,6 +124,18 @@ sleep 8
 echo "Waiting for robot_description_semantic parameter..."
 timeout 30 bash -c 'until ros2 param list /move_group 2>/dev/null | grep -q robot_description_semantic; do sleep 1; done' || echo "Warning: robot_description_semantic not found, continuing anyway..."
 sleep 2
+
+if [ "$USE_FAKE_HARDWARE" = false ]; then
+    echo ""
+    echo "*** IMPORTANT: Now load ros.urp on the UR5e teach pendant ***"
+    echo "*** Connect to 192.168.0.77:50002 ***"
+    read -p "Press Enter after connecting the robot..."
+    echo ""
+else
+    echo ""
+    echo "*** SIMULATION MODE: Skipping robot connection prompt ***"
+    echo ""
+fi
 
 # 3. Go Home
 echo "[3/7] Moving robot to HOME position..."

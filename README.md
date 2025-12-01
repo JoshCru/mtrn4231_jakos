@@ -301,7 +301,7 @@ Requires Universal Robots' `ur_robot_driver`.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `useSnapping` | `false` | When `true`, snaps output to discrete weights (0, 50, 100, 200, 500g). When `false`, outputs continuous values rounded to nearest 5g. |
+| `useSnapping` | `false` | When `true`, snaps output to discrete weights (0, 100, 200, 500g) for improved accuracy within the test weight set. When `false`, outputs continuous values rounded to the nearest gram, offering more continuous results but requiring longer to settle. |
 
 #### How It Works
 
@@ -316,8 +316,9 @@ Current Joint Torques → Kalman Filter → Torque Deltas → Kinematics → Mas
 3. **Torque Filtering**: Incoming joint torques are smoothed using per-joint Kalman filters.
 4. **Mass Estimation**: The difference between current and baseline torques is used with UR5e forward kinematics to compute moment arms, then mass is estimated via $\tau = m \times g \times r$.
 5. **Output Calibration**:
-   - **Snapping ON** (`useSnapping: true`): Uses exponential calibration curves and snaps to the nearest weight class {0, 50, 100, 200, 500}g.
-   - **Snapping OFF** (`useSnapping: false`): Uses polynomial calibration for more accurate continuous output, rounded to the nearest 5g.
+   The system now uses a polynomial gain factor of $ax^2 + bx + c$ to calibrate estimates.
+   - **Snapping ON** (`useSnapping: true`): Estimates are generously snapped to discrete weight classes {0, 100, 200, 500}g, optimised for accuracy within the defined test weight set.
+   - **Snapping OFF** (`useSnapping: false`): Provides continuous mass estimates, rounded to the nearest gram. This offers smoother results but may require more time to settle.
 
 #### Usage
 
@@ -381,7 +382,7 @@ ros2 run weight_detection_module weight_detector_py.py
 - **Calibration delay**: The node requires ~5.5 seconds of baseline calibration on startup before producing estimates. Wait for `/weight_detection/calibration_status` to publish `false` before measurements are valid.
 - **Recalibration required**: If the gripper or tool changes, call the calibration service to re-establish the baseline.
 - **Fixed baseline pose**: Gripper must return to the exact joint pose where calibration occurred for accurate estimates.
-- **Known weight set**: Snapping mode assumes payloads are one of {0, 50, 100, 200, 500} grams. For arbitrary weights, disable snapping for more accurate continuous estimates.
+- **Known weight set**: Snapping mode assumes payloads are one of {0, 100, 200, 500} grams. For arbitrary weights, disable snapping for more accurate continuous estimates.
 
 ### System Visualization
 
@@ -934,7 +935,7 @@ The system was designed to achieve:
 ### Quantitative Results
 
 **Weight Detection Performance:**
-- Discrete snapping mode: 0g, 50g, 100g, 200g, 500g classification
+- Discrete snapping mode: 0g, 100g, 200g, 500g classification
 - Continuous mode: Polynomial calibration, ±5g accuracy
 - Calibration time: ~5.5 seconds
 - Measurement stabilization: ~10 seconds after pickup
