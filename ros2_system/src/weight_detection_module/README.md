@@ -103,7 +103,7 @@ We recommend changing the Buffer size (top left, under "Streaming") to **90 seco
 #### Alternative: Python Node
 **WARNING**: Only intended for visualisation of torque filtering on all 6 robot joints as this uses an outdated estimator.
 ```bash
-ros2 run weight_detection_module weight_detector_py.py
+ros2 run weight_detection_module weight_detector_py
 ```
 
 ## Limitations and Assumptions
