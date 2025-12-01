@@ -30,27 +30,30 @@ source install/setup.bash
 echo -e "\n${GREEN}[3/4] Launching weight detection nodes...${NC}"
 
 echo -e "${BLUE}Starting Python node (/estimated_mass_py)...${NC}"
-ros2 run weight_detection_module weight_detector.py --ros-args -r /estimated_mass:=/estimated_mass_py &
+ros2 run weight_detection_module weight_detector_py --ros-args -r /estimated_mass:=/estimated_mass_py &
 PY_PID=$!
 
 sleep 1
 
 echo -e "${BLUE}Starting C++ node (/estimated_mass_cpp)...${NC}"
-ros2 run weight_detection_module weight_detector_cpp --ros-args -r /estimated_mass:=/estimated_mass_cpp &
+ros2 run weight_detection_module weight_detector --ros-args -r /estimated_mass:=/estimated_mass_cpp &
 CPP_PID=$!
 
 sleep 2
 
 # Step 4: Play rosbag
 echo -e "\n${GREEN}[4/4] Playing rosbag...${NC}"
-echo -e "${BLUE}Bag: rosbag2_200_3cm_lift${NC}"
-ros2 bag play ../../../rosbags2/rosbag2_200_3cm_lift
+echo -e "${BLUE}Bag: rosbag2_500_3cm_lift${NC}"
+ros2 bag play ../rosbags2/rosbag2_500_3cm_lift
 
 # Cleanup function
 cleanup() {
     echo -e "\n${RED}Stopping all nodes...${NC}"
     kill $PY_PID 2>/dev/null
     kill $CPP_PID 2>/dev/null
+    # Force kill the actual binaries
+    pkill -f "weight_detection_module/weight_detector" 2>/dev/null
+    pkill -f "weight_detector_py" 2>/dev/null
     echo -e "${GREEN}Done!${NC}"
 }
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Test script for C++ weight detection node with 500g rosbag
+# Test script for C++ weight detection node with 100g rosbag
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 cd "$(dirname "$0")"
 
 echo -e "${BLUE}======================================${NC}"
-echo -e "${BLUE}C++ Weight Detection Test - 500g${NC}"
+echo -e "${BLUE}C++ Weight Detection Test - 100g${NC}"
 echo -e "${BLUE}======================================${NC}"
 
 # Step 1: Build the package
@@ -29,20 +29,22 @@ source install/setup.bash
 # Step 3: Launch C++ node in background
 echo -e "\n${GREEN}[3/3] Launching C++ weight detection node...${NC}"
 echo -e "${BLUE}Starting C++ node (/estimated_mass)...${NC}"
-ros2 run weight_detection_module weight_detector_cpp &
+ros2 run weight_detection_module weight_detector --ros-args -p useSnapping:=true &
 CPP_PID=$!
 
 sleep 2
 
 # Step 4: Play rosbag
 echo -e "\n${GREEN}[4/4] Playing rosbag...${NC}"
-echo -e "${BLUE}Bag: rosbag2_500_3cm_lift${NC}"
-ros2 bag play ../../../rosbags2/rosbag2_500_3cm_lift
+echo -e "${BLUE}Bag: rosbag2_100_3cm_lift${NC}"
+ros2 bag play ../rosbags2/rosbag2_100_3cm_lift
 
 # Cleanup function
 cleanup() {
     echo -e "\n${RED}Stopping C++ node...${NC}"
     kill $CPP_PID 2>/dev/null
+    # Force kill the actual binary in case ros2 run didn't propagate the signal
+    pkill -f "weight_detection_module/weight_detector" 2>/dev/null
     echo -e "${GREEN}Done!${NC}"
 }
 
