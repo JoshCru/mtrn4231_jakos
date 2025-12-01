@@ -346,7 +346,11 @@ private:
         RCLCPP_INFO(this->get_logger(), "Executing trajectory with %zu points...",
             trajectory_goal.trajectory.points.size());
 
-        // Send goal
+        // Store result in a promise to be filled by the callback
+        auto result_promise = std::make_shared<std::promise<rclcpp_action::ClientGoalHandle<FollowJointTrajectory>::WrappedResult>>();
+        auto result_future = result_promise->get_future();
+
+        // Send goal with result callback
         auto send_goal_options = rclcpp_action::Client<FollowJointTrajectory>::SendGoalOptions();
 
         send_goal_options.goal_response_callback =
@@ -356,6 +360,12 @@ private:
                 } else {
                     RCLCPP_INFO(this->get_logger(), "Goal accepted by server, executing...");
                 }
+            };
+
+        send_goal_options.result_callback =
+            [this, result_promise](const GoalHandleFJT::WrappedResult & result) {
+                RCLCPP_INFO(this->get_logger(), "Goal sent, waiting for result...");
+                result_promise->set_value(result);
             };
 
         auto goal_future = trajectory_action_client_->async_send_goal(
@@ -377,24 +387,15 @@ private:
             return;
         }
 
-        RCLCPP_INFO(this->get_logger(), "Goal sent, waiting for result...");
+        // Wait for result with timeout (callback will fill the promise)
+        auto timeout = std::chrono::seconds(120);
+        auto status = result_future.wait_for(timeout);
 
-        // Get result future and poll for completion
-        auto result_future = trajectory_action_client_->async_get_result(goal_handle);
-
-        auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds(120);
-        while (rclcpp::ok()) {
-            if (std::chrono::steady_clock::now() > timeout) {
-                response->success = false;
-                response->message = "Trajectory execution timed out after 120 seconds";
-                RCLCPP_ERROR(this->get_logger(), "Execution timeout");
-                return;
-            }
-
-            auto status = result_future.wait_for(std::chrono::milliseconds(100));
-            if (status == std::future_status::ready) {
-                break;
-            }
+        if (status != std::future_status::ready) {
+            response->success = false;
+            response->message = "Trajectory execution timed out after 120 seconds";
+            RCLCPP_ERROR(this->get_logger(), "Execution timeout");
+            return;
         }
 
         // Get the result

@@ -39,9 +39,18 @@ ament_target_dependencies(cartesian_controller_node
   sort_interfaces
 )
 
+# simple_pick_and_weigh_node executable (C++)
+add_executable(simple_pick_and_weigh_node src/simple_pick_and_weigh_node.cpp)
+ament_target_dependencies(simple_pick_and_weigh_node
+  rclcpp
+  std_msgs
+  sort_interfaces
+)
+
 # Install C++ targets
 install(TARGETS
   cartesian_controller_node
+  simple_pick_and_weigh_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

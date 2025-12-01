@@ -46,34 +46,6 @@ echo ""
 source /opt/ros/humble/setup.bash
 source "${ROS2_WS}/install/setup.bash"
 
-# Set FastDDS profile for reliable communication
-export FASTRTPS_DEFAULT_PROFILES_FILE=/tmp/fastdds_profile.xml
-export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-
-# Create FastDDS profile
-cat > /tmp/fastdds_profile.xml << 'EOF'
-<?xml version="1.0" encoding="UTF-8" ?>
-<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
-    <transport_descriptors>
-        <transport_descriptor>
-            <transport_id>CustomUdpTransport</transport_id>
-            <type>UDPv4</type>
-        </transport_descriptor>
-    </transport_descriptors>
-    <participant profile_name="participant_profile" is_default_profile="true">
-        <rtps>
-            <userTransports>
-                <transport_id>CustomUdpTransport</transport_id>
-            </userTransports>
-            <useBuiltinTransports>false</useBuiltinTransports>
-        </rtps>
-    </participant>
-</profiles>
-EOF
-
-echo "FastDDS profile created"
-echo ""
-
 # 1. UR Driver (Fake Hardware)
 echo "[1/8] Starting UR5e Driver (SIMULATION)..."
 wait_for_enter

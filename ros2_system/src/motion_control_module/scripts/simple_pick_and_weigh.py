@@ -29,6 +29,7 @@ Prerequisites:
 import rclpy
 from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 from std_msgs.msg import Bool, Int32
 from sensor_msgs.msg import JointState
 from sort_interfaces.srv import MoveToCartesian, GripperControl, CalibrateBaseline
@@ -71,11 +72,23 @@ class SimplePickAndWeigh(Node):
 
         self.get_logger().info('Simple Pick and Weigh Node initialized')
         self.get_logger().info(f'Grip weight: {self.grip_weight}g')
-        self.get_logger().info('Waiting 2 seconds for all systems to be ready...')
-        time.sleep(2.0)
 
-        # Start the pick and weigh sequence
-        self.execute_pick_and_weigh()
+        # Start the pick and weigh sequence after a short delay (using a one-shot timer)
+        # This ensures the executor is spinning before we start making service calls
+        self.get_logger().info('Waiting 2 seconds for all systems to be ready...')
+        self.sequence_started = False
+        self.start_timer = self.create_timer(
+            2.0,
+            self._timer_callback,
+            callback_group=self.callback_group
+        )
+
+    def _timer_callback(self):
+        """One-shot timer callback to start the sequence."""
+        if not self.sequence_started:
+            self.sequence_started = True
+            self.start_timer.cancel()  # Make it one-shot
+            self.execute_pick_and_weigh()
 
     def _init_clients(self):
         """Initialize service clients."""
@@ -184,9 +197,19 @@ class SimplePickAndWeigh(Node):
         self.get_logger().info(f'Moving to: X={x:.1f}, Y={y:.1f}, Z={z:.1f}')
 
         future = self.move_client.call_async(req)
-        rclpy.spin_until_future_complete(self, future, timeout_sec=30.0)
 
-        if future.result() is not None and future.result().success:
+        # Wait for future without blocking the executor
+        # (same pattern as sorting_brain_node.py)
+        timeout = 120.0
+        start = time.time()
+        while not future.done():
+            if time.time() - start > timeout:
+                self.get_logger().error('Move service call timed out')
+                return False
+            time.sleep(0.05)  # Small sleep to avoid busy waiting
+
+        result = future.result()
+        if result is not None and result.success:
             self.current_x = x
             self.current_y = y
             self.current_z = z
@@ -205,12 +228,22 @@ class SimplePickAndWeigh(Node):
         self.get_logger().info(f'Gripper: {cmd_name.get(command, command)}')
 
         future = self.gripper_client.call_async(req)
-        rclpy.spin_until_future_complete(self, future, timeout_sec=10.0)
 
-        if future.result() is not None and future.result().success:
+        # Wait for future without blocking the executor
+        # Add extra timeout for wait_time_sec
+        timeout = 15.0
+        start = time.time()
+        while not future.done():
+            if time.time() - start > timeout:
+                self.get_logger().warn(f'Gripper command {command} timed out')
+                return False
+            time.sleep(0.05)
+
+        result = future.result()
+        if result is not None and result.success:
             return True
         else:
-            self.get_logger().warn(f'Gripper command {command} failed or timed out')
+            self.get_logger().warn(f'Gripper command {command} failed')
             return False
 
     def call_calibration(self) -> bool:
@@ -219,10 +252,19 @@ class SimplePickAndWeigh(Node):
 
         req = CalibrateBaseline.Request()
         future = self.calibrate_weight_client.call_async(req)
-        rclpy.spin_until_future_complete(self, future, timeout_sec=10.0)
 
-        if future.result() is not None and future.result().success:
-            self.get_logger().info(f'Calibration service response: {future.result().message}')
+        # Wait for future without blocking the executor
+        timeout = 10.0
+        start = time.time()
+        while not future.done():
+            if time.time() - start > timeout:
+                self.get_logger().error('Calibration service call timed out')
+                return False
+            time.sleep(0.05)
+
+        result = future.result()
+        if result is not None and result.success:
+            self.get_logger().info(f'Calibration service response: {result.message}')
             return True
         else:
             self.get_logger().error('Calibration service call failed!')
@@ -360,8 +402,13 @@ def main(args=None):
     try:
         node = SimplePickAndWeigh()
 
+        # Use MultiThreadedExecutor for concurrent callbacks
+        executor = MultiThreadedExecutor()
+        executor.add_node(node)
+
         # Keep node alive to show final weight
-        rclpy.spin(node)
+        node.get_logger().info('Simple Pick and Weigh Node running...')
+        executor.spin()
 
     except KeyboardInterrupt:
         print('\nShutdown requested by user')

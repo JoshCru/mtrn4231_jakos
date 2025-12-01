@@ -77,33 +77,6 @@ echo ""
 source /opt/ros/humble/setup.bash
 source "${ROS2_WS}/install/setup.bash"
 
-# Set FastDDS profile for reliable communication
-export FASTRTPS_DEFAULT_PROFILES_FILE=/tmp/fastdds_profile.xml
-export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-
-# Create FastDDS profile
-cat > /tmp/fastdds_profile.xml << 'EOF'
-<?xml version="1.0" encoding="UTF-8" ?>
-<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
-    <transport_descriptors>
-        <transport_descriptor>
-            <transport_id>CustomUdpTransport</transport_id>
-            <type>UDPv4</type>
-        </transport_descriptor>
-    </transport_descriptors>
-    <participant profile_name="participant_profile" is_default_profile="true">
-        <rtps>
-            <userTransports>
-                <transport_id>CustomUdpTransport</transport_id>
-            </userTransports>
-            <useBuiltinTransports>false</useBuiltinTransports>
-        </rtps>
-    </participant>
-</profiles>
-EOF
-
-echo "FastDDS profile created"
-echo ""
 
 # 1. UR Driver
 echo "[1/7] Starting UR5e Driver..."
@@ -159,12 +132,6 @@ ros2 run motion_control_module go_home 5.0
 echo "Robot at home position"
 sleep 2
 
-# 4. Safety Visualizer
-echo "[4/7] Starting Safety Visualizer..."
-wait_for_enter
-python3 "${ROS2_WS}/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_collision.py" &
-SAFETY_PID=$!
-sleep 2
 
 # 5. Simulated Perception (optional)
 PERCEPTION_PID=""
@@ -184,7 +151,7 @@ fi
 
 # 6. Weight Detection
 WEIGHT_PID=""
-if [ "$USE_FAKE_HARDWARE" = false ]; then
+if [ "$USE_FAKE_HARDWARE" = true ]; then
     echo "[6/7] Starting Real Weight Detection..."
     wait_for_enter
     ros2 run weight_detection_module weight_detector &
@@ -223,13 +190,16 @@ echo "=========================================="
 echo "   All systems launched!"
 echo "=========================================="
 echo ""
-echo "Now you can run the simple pick and weigh script:"
+echo "Now running simple pick and weigh (C++ version)..."
 echo ""
-echo "  ros2 run motion_control_module simple_pick_and_weigh.py --ros-args -p grip_weight:=${GRIP_WEIGHT}"
+
+# Run the C++ simple pick and weigh node
+ros2 run motion_control_module simple_pick_and_weigh_node \
+    --ros-args \
+    -p grip_weight:=${GRIP_WEIGHT}
+
 echo ""
-echo "Or manually with custom grip weight:"
-echo ""
-echo "  ros2 run motion_control_module simple_pick_and_weigh.py --ros-args -p grip_weight:=200"
+echo "Pick and weigh complete!"
 echo ""
 echo "Press Ctrl+C to stop all systems..."
 

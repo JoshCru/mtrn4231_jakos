@@ -60,45 +60,15 @@ echo ""
 source /opt/ros/humble/setup.bash
 source "${ROS2_WS}/install/setup.bash"
 
-# Set FastDDS profile for reliable communication
-export FASTRTPS_DEFAULT_PROFILES_FILE=/tmp/fastdds_profile.xml
-export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-
-# Create FastDDS profile
-cat > /tmp/fastdds_profile.xml << 'EOF'
-<?xml version="1.0" encoding="UTF-8" ?>
-<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
-    <transport_descriptors>
-        <transport_descriptor>
-            <transport_id>CustomUdpTransport</transport_id>
-            <type>UDPv4</type>
-        </transport_descriptor>
-    </transport_descriptors>
-    <participant profile_name="participant_profile" is_default_profile="true">
-        <rtps>
-            <userTransports>
-                <transport_id>CustomUdpTransport</transport_id>
-            </userTransports>
-            <useBuiltinTransports>false</useBuiltinTransports>
-        </rtps>
-    </participant>
-</profiles>
-EOF
-
-echo "FastDDS profile created"
-echo ""
-
 # 1. UR Driver
 echo "[1/8] Starting UR5e Driver..."
 wait_for_enter
-ros2 launch ur_robot_driver ur_control.launch.py \
-    ur_type:=ur5e \
-    robot_ip:=$ROBOT_IP \
-    initial_joint_controller:=scaled_joint_trajectory_controller \
-    use_fake_hardware:=false \
-    launch_rviz:=false \
-    description_file:=ur5e_with_end_effector.urdf.xacro \
-    description_package:=motion_control_module &
+ros2 launch ur_robot_driver ur_control.launch.py ur_type:=ur5e \
+ robot_ip:=$ROBOT_IP \
+ use_fake_hardware:=false \
+ launch_rviz:=false \
+ description_file:=ur5e_with_end_effector.urdf.xacro \
+ description_package:=motion_control_module &
 UR_PID=$!
 
 echo "Waiting for UR driver to initialize..."
@@ -136,12 +106,12 @@ ros2 run motion_control_module go_home 5.0
 echo "Robot at home position"
 sleep 2
 
-# 4. Safety Visualizer
-echo "[4/8] Starting Safety Visualizer..."
-wait_for_enter
-python3 "${ROS2_WS}/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_collision.py" &
-SAFETY_PID=$!
-sleep 2
+# # 4. Safety Visualizer
+# echo "[4/8] Starting Safety Visualizer..."
+# wait_for_enter
+# python3 "${ROS2_WS}/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_collision.py" &
+# SAFETY_PID=$!
+# sleep 2
 
 # 5. Simulated Perception
 echo "[5/8] Starting Simulated Perception..."
