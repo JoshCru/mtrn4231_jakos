@@ -204,7 +204,6 @@ public:
         min_threshold_ /= calibration_factor_;
 
         // Polynomial calibration parameters
-        // this->declare_parameter("poly_coeff_a", 0.0);     // cubic term (unused)
         this->declare_parameter("poly_coeff_a", -0.1612); // quadratic term
         this->declare_parameter("poly_coeff_b", 20.75);   // linear term
         this->declare_parameter("poly_coeff_c", -152.7);  // constant term
