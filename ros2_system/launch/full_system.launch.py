@@ -94,6 +94,12 @@ def generate_launch_description():
     use_simulated_perception = PythonExpression(["'", mode, "' != 'real'"])
     gripper_simulation_mode = PythonExpression(["'", mode, "' == 'simulation'"])
 
+    # For real hardware, use scaled_joint_trajectory_controller
+    # For simulation, use joint_trajectory_controller
+    initial_joint_controller = PythonExpression([
+        "'scaled_joint_trajectory_controller' if '", mode, "' != 'simulation' else 'joint_trajectory_controller'"
+    ])
+
     # Find package shares
     motion_control_share = FindPackageShare('motion_control_module')
 
@@ -142,7 +148,7 @@ echo "FastDDS profile created at /tmp/fastdds_profile.xml"
                 launch_arguments={
                     'ur_type': 'ur5e',
                     'robot_ip': robot_ip,
-                    'initial_joint_controller': 'joint_trajectory_controller',
+                    'initial_joint_controller': initial_joint_controller,
                     'use_fake_hardware': use_fake_hardware,
                     'launch_rviz': 'false',
                     'description_file': 'ur5e_with_end_effector.urdf.xacro',
