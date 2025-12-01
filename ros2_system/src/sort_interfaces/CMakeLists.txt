@@ -29,11 +29,13 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/CalibrateBaseline.srv"
   "srv/GripperControl.srv"
   "srv/MoveToJointPosition.srv"
+  "srv/MoveToCartesian.srv"
   # Actions
   "action/PickObject.action"
   "action/PlaceObject.action"
   "action/PlanTrajectory.action"
   "action/VerifyWeight.action"
+  "action/MoveToCartesian.action"
   DEPENDENCIES
     std_msgs
     geometry_msgs

@@ -17,25 +17,54 @@ find_package(rclcpp_action REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(trajectory_msgs REQUIRED)
+find_package(control_msgs REQUIRED)
 find_package(moveit_msgs REQUIRED)
 find_package(sort_interfaces REQUIRED)
+find_package(std_srvs REQUIRED)
+find_package(moveit_ros_planning_interface REQUIRED)
 
-# joint_movement_controller executable (C++)
-add_executable(joint_movement_controller src/joint_movement_controller.cpp)
-ament_target_dependencies(joint_movement_controller
+# cartesian_controller_node executable (C++)
+add_executable(cartesian_controller_node src/cartesian_controller_node.cpp)
+ament_target_dependencies(cartesian_controller_node
   rclcpp
   rclcpp_action
   std_msgs
+  std_srvs
   sensor_msgs
   geometry_msgs
+  trajectory_msgs
+  control_msgs
   moveit_msgs
+  sort_interfaces
+)
+
+# simple_pick_and_weigh_node executable (C++)
+add_executable(simple_pick_and_weigh_node src/simple_pick_and_weigh_node.cpp)
+ament_target_dependencies(simple_pick_and_weigh_node
+  rclcpp
+  std_msgs
   sort_interfaces
 )
 
 # Install C++ targets
 install(TARGETS
-  joint_movement_controller
+  cartesian_controller_node
+  simple_pick_and_weigh_node
   DESTINATION lib/${PROJECT_NAME}
+)
+
+# Install Python scripts as executables
+install(PROGRAMS
+  scripts/go_home.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME go_home
+)
+
+install(PROGRAMS
+  scripts/simple_pick_and_weigh.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME simple_pick_and_weigh
 )
 
 # Install launch files, config, urdf, scripts, srdf, and meshes

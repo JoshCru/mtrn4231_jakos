@@ -12,7 +12,6 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
     ],
     install_requires=['setuptools'],
@@ -24,8 +23,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'sorting_brain_node = supervisor_module.sorting_brain_node:main',
+            'simulated_perception_node = supervisor_module.simulated_perception_node:main',
             'system_dashboard = supervisor_module.system_dashboard:main',
-            'brain_dashboard = supervisor_module.brain_dashboard:main',
         ],
     },
 )

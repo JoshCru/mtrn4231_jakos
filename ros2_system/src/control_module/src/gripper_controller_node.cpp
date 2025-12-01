@@ -364,29 +364,47 @@ private:
         }
 
         std::string cmd = request->command;
+        int weight = request->weight;
+        float wait_time_sec = request->wait_time_sec > 0 ? request->wait_time_sec : 5.0f;  // Default 5 seconds
         float target_position = current_position_;
 
         // Parse command
-        if (cmd == "open" || cmd == "w") {
+        if (cmd == "edit" || cmd == "e") {
+            // Edit grip angle for specific weight (100, 200, or 500)
+            if (weight != 100 && weight != 200 && weight != 500) {
+                response->success = false;
+                response->message = "Invalid weight for edit command. Use 100, 200, or 500";
+                response->final_position = current_position_;
+                RCLCPP_WARN(this->get_logger(), "Invalid weight: %d", weight);
+                return;
+            }
+            send_edit_command(weight);
+            response->success = true;
+            response->message = "Grip angle set for " + std::to_string(weight) + "g";
+            response->final_position = current_position_;
+            RCLCPP_INFO(this->get_logger(), "Grip angle set for %dg", weight);
+            return;  // No wait needed for edit command
+        }
+        else if (cmd == "open" || cmd == "w" || cmd == "W") {
             target_position = 0.0f;  // Open
-            RCLCPP_INFO(this->get_logger(), "Opening gripper via service");
-        } else if (cmd == "close" || cmd == "s") {
+            send_gripper_command(target_position);
+            RCLCPP_INFO(this->get_logger(), "Opening gripper via service, waiting %.1fs...", wait_time_sec);
+        }
+        else if (cmd == "close" || cmd == "s" || cmd == "S") {
             target_position = 1.0f;  // Close
-            RCLCPP_INFO(this->get_logger(), "Closing gripper via service");
-        } else {
+            send_gripper_command(target_position);
+            RCLCPP_INFO(this->get_logger(), "Closing gripper via service, waiting %.1fs...", wait_time_sec);
+        }
+        else {
             response->success = false;
-            response->message = "Invalid command. Use 'open', 'close', 'w', or 's'";
+            response->message = "Invalid command. Use 'open', 'close', 'edit', 'w', 's', or 'e'";
             response->final_position = current_position_;
             RCLCPP_WARN(this->get_logger(), "Invalid gripper command: %s", cmd.c_str());
             return;
         }
 
-        // Send command to gripper
-        send_gripper_command(target_position);
-
-        // Wait for movement to complete (estimate based on travel distance)
-        float travel_distance = std::abs(target_position - current_position_);
-        int wait_ms = static_cast<int>(travel_distance * 2000);  // ~2 seconds for full travel
+        // Wait for specified time (default 5 seconds for open/close)
+        int wait_ms = static_cast<int>(wait_time_sec * 1000);
         if (wait_ms > 0) {
             rclcpp::sleep_for(std::chrono::milliseconds(wait_ms));
         }
@@ -396,6 +414,25 @@ private:
         response->final_position = current_position_;
 
         RCLCPP_INFO(this->get_logger(), "Gripper control complete: %s", response->message.c_str());
+    }
+
+    void send_edit_command(int weight)
+    {
+        // Send edit command to Arduino: "E <weight>"
+        std::string command = "E " + std::to_string(weight);
+
+        if (!simulation_mode_ && serial_ && serial_->isOpen()) {
+            try {
+                serial_->write(command);
+                RCLCPP_INFO(this->get_logger(), "Sent to Arduino: %s (setting grip angle for %dg)",
+                           command.c_str(), weight);
+            } catch (const std::exception& e) {
+                RCLCPP_WARN(this->get_logger(), "Failed to send edit command: %s", e.what());
+            }
+        } else {
+            RCLCPP_INFO(this->get_logger(), "Simulation: Edit command %s (grip angle for %dg)",
+                       command.c_str(), weight);
+        }
     }
 
     // Member variables

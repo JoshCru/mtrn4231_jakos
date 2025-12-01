@@ -168,16 +168,16 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    # RViz with MoveIt configuration
+    # RViz with custom sorting system configuration (includes marker displays)
     rviz_config_file = PathJoinSubstitution(
-        [FindPackageShare("ur_moveit_config"), "rviz", "view_robot.rviz"]
+        [FindPackageShare("motion_control_module"), "config", "sorting_system.rviz"]
     )
     rviz_node = Node(
         package="rviz2",
         condition=IfCondition(launch_rviz),
         executable="rviz2",
         name="rviz2_moveit",
-        output="log",
+        output="screen",
         arguments=["-d", rviz_config_file],
         parameters=[
             robot_description,

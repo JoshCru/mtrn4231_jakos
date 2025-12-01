@@ -1,14 +1,19 @@
 /**
  * @file place_operation_node.cpp
  * @brief Place operation coordinator with state machine
+ *
+ * Uses the cartesian controller service for actual robot movements.
  */
 
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <std_msgs/msg/float32.hpp>
 #include "sort_interfaces/action/place_object.hpp"
+#include "sort_interfaces/srv/move_to_cartesian.hpp"
+#include "sort_interfaces/srv/gripper_control.hpp"
 #include <control_msgs/action/follow_joint_trajectory.hpp>
 #include <string>
+#include <mutex>
 
 class PlaceOperationNode : public rclcpp::Node
 {
@@ -16,6 +21,18 @@ public:
     using PlaceObject = sort_interfaces::action::PlaceObject;
     using GoalHandlePlaceObject = rclcpp_action::ServerGoalHandle<PlaceObject>;
     using FollowJointTrajectory = control_msgs::action::FollowJointTrajectory;
+    using MoveToCartesian = sort_interfaces::srv::MoveToCartesian;
+    using GripperControl = sort_interfaces::srv::GripperControl;
+
+    // Z heights in mm (tool0 frame) - from pick_and_place_demo.py
+    static constexpr double Z_HOME = 371.0;
+    static constexpr double Z_DESCEND = 210.0;
+    static constexpr double Z_PLACE = 180.0;
+
+    // Default orientation (facing down)
+    static constexpr double RX = 2.221;
+    static constexpr double RY = 2.221;
+    static constexpr double RZ = 0.0;
 
     enum class PlaceState {
         IDLE,
@@ -30,6 +47,10 @@ public:
 
     PlaceOperationNode() : Node("place_operation_node"), current_state_(PlaceState::IDLE)
     {
+        // Create callback group for concurrent operations
+        callback_group_ = this->create_callback_group(
+            rclcpp::CallbackGroupType::Reentrant);
+
         // Declare parameters
         this->declare_parameter("approach_height", 0.15);    // meters above target
         this->declare_parameter("retreat_distance", 0.2);    // meters
@@ -61,10 +82,26 @@ public:
         trajectory_client_ = rclcpp_action::create_client<FollowJointTrajectory>(
             this, "/control/execute_trajectory");
 
+        // Service clients for cartesian movement and gripper control
+        move_client_ = this->create_client<MoveToCartesian>(
+            "/motion_control/move_to_cartesian",
+            rmw_qos_profile_services_default,
+            callback_group_);
+
+        gripper_client_ = this->create_client<GripperControl>(
+            "/motion_control/gripper_control",
+            rmw_qos_profile_services_default,
+            callback_group_);
+
+        // Wait for services
+        RCLCPP_INFO(this->get_logger(), "Waiting for motion control services...");
+        move_client_->wait_for_service(std::chrono::seconds(30));
+        gripper_client_->wait_for_service(std::chrono::seconds(30));
+        RCLCPP_INFO(this->get_logger(), "Motion control services ready");
+
         RCLCPP_INFO(this->get_logger(), "Place Operation Node initialized");
-        RCLCPP_INFO(this->get_logger(),
-                   "Approach height: %.3f m, Retreat distance: %.3f m",
-                   approach_height_, retreat_distance_);
+        RCLCPP_INFO(this->get_logger(), "Z heights: descend=%.1f mm, place=%.1f mm",
+                   Z_DESCEND, Z_PLACE);
     }
 
 private:
@@ -174,59 +211,126 @@ private:
         result->success = true;
         result->message = "Place operation completed successfully";
 
-        RCLCPP_INFO(this->get_logger(), "✓ Place operation complete");
+        RCLCPP_INFO(this->get_logger(), "Place operation complete");
 
         goal_handle->succeed(result);
         current_state_ = PlaceState::IDLE;
     }
 
+    bool move_to_cartesian(double x_mm, double y_mm, double z_mm)
+    {
+        // Call the cartesian movement service
+        auto request = std::make_shared<MoveToCartesian::Request>();
+        request->x = x_mm;
+        request->y = y_mm;
+        request->z = z_mm;
+        request->rx = RX;
+        request->ry = RY;
+        request->rz = RZ;
+
+        RCLCPP_INFO(this->get_logger(), "Moving to (%.1f, %.1f, %.1f) mm...",
+                   x_mm, y_mm, z_mm);
+
+        auto future = move_client_->async_send_request(request);
+
+        // Wait for result with timeout
+        auto status = future.wait_for(std::chrono::seconds(120));
+        if (status != std::future_status::ready) {
+            RCLCPP_ERROR(this->get_logger(), "Move service timed out");
+            return false;
+        }
+
+        auto response = future.get();
+        if (response->success) {
+            RCLCPP_INFO(this->get_logger(), "Move completed: %s", response->message.c_str());
+            return true;
+        } else {
+            RCLCPP_ERROR(this->get_logger(), "Move failed: %s", response->message.c_str());
+            return false;
+        }
+    }
+
     bool move_to_approach_position(const geometry_msgs::msg::Pose& target)
     {
-        // TODO: Plan and execute trajectory to approach position
-        // Approach position = target position + vertical offset
-        RCLCPP_INFO(this->get_logger(),
-                   "Moving to approach position (%.3f m above target)...",
-                   approach_height_);
+        // Convert target pose from meters to mm
+        double x_mm = target.position.x * 1000.0;
+        double y_mm = target.position.y * 1000.0;
 
-        rclcpp::sleep_for(std::chrono::seconds(1));  // Simulate motion
-        return true;
+        RCLCPP_INFO(this->get_logger(), "Moving to approach position above placement...");
+
+        // Move to Z_DESCEND height above the target
+        return move_to_cartesian(x_mm, y_mm, Z_DESCEND);
     }
 
     bool lower_to_place_position(const geometry_msgs::msg::Pose& target)
     {
-        // TODO: Plan and execute slow lowering motion
-        // Final position should be slightly above surface to account for object size
-        RCLCPP_INFO(this->get_logger(),
-                   "Lowering to placement position (%.3f m offset)...",
-                   place_offset_);
+        double x_mm = target.position.x * 1000.0;
+        double y_mm = target.position.y * 1000.0;
 
-        rclcpp::sleep_for(std::chrono::milliseconds(800));  // Simulate slow motion
-        return true;
+        RCLCPP_INFO(this->get_logger(), "Lowering to placement position...");
+
+        // Move to Z_PLACE height
+        return move_to_cartesian(x_mm, y_mm, Z_PLACE);
     }
 
     bool retreat_from_object(const geometry_msgs::msg::Pose& current_pose, float retreat_dist)
     {
-        // TODO: Plan and execute retreat motion
-        // Move up and/or back to safe distance
-        RCLCPP_INFO(this->get_logger(), "Retreating %.3f m...", retreat_dist);
+        double x_mm = current_pose.position.x * 1000.0;
+        double y_mm = current_pose.position.y * 1000.0;
 
-        rclcpp::sleep_for(std::chrono::milliseconds(600));  // Simulate motion
-        return true;
+        RCLCPP_INFO(this->get_logger(), "Retreating to descend height...");
+
+        // Retreat to Z_DESCEND
+        return move_to_cartesian(x_mm, y_mm, Z_DESCEND);
+    }
+
+    bool gripper_control(const std::string& command)
+    {
+        auto request = std::make_shared<GripperControl::Request>();
+        request->command = command;
+
+        RCLCPP_INFO(this->get_logger(), "Gripper command: %s", command.c_str());
+
+        auto future = gripper_client_->async_send_request(request);
+
+        auto status = future.wait_for(std::chrono::seconds(10));
+        if (status != std::future_status::ready) {
+            RCLCPP_ERROR(this->get_logger(), "Gripper service timed out");
+            return false;
+        }
+
+        auto response = future.get();
+        if (response->success) {
+            RCLCPP_INFO(this->get_logger(), "Gripper %s: %s", command.c_str(), response->message.c_str());
+            return true;
+        } else {
+            RCLCPP_ERROR(this->get_logger(), "Gripper %s failed: %s", command.c_str(), response->message.c_str());
+            return false;
+        }
     }
 
     void release_gripper()
     {
-        auto cmd = std_msgs::msg::Float32();
-        cmd.data = gripper_open_value_;  // 0.0 = fully open
-        gripper_command_pub_->publish(cmd);
-        RCLCPP_INFO(this->get_logger(), "Releasing gripper...");
+        // Use service for more reliable control
+        if (!gripper_control("open")) {
+            // Fallback to topic
+            auto cmd = std_msgs::msg::Float32();
+            cmd.data = gripper_open_value_;
+            gripper_command_pub_->publish(cmd);
+        }
     }
 
     // Member variables
+    rclcpp::CallbackGroup::SharedPtr callback_group_;
+
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr gripper_command_pub_;
 
     rclcpp_action::Server<PlaceObject>::SharedPtr place_action_server_;
     rclcpp_action::Client<FollowJointTrajectory>::SharedPtr trajectory_client_;
+
+    // Service clients for motion control
+    rclcpp::Client<MoveToCartesian>::SharedPtr move_client_;
+    rclcpp::Client<GripperControl>::SharedPtr gripper_client_;
 
     PlaceState current_state_;
     double approach_height_;
@@ -240,7 +344,12 @@ int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<PlaceOperationNode>();
-    rclcpp::spin(node);
+
+    // Use MultiThreadedExecutor to allow concurrent service calls
+    rclcpp::executors::MultiThreadedExecutor executor;
+    executor.add_node(node);
+    executor.spin();
+
     rclcpp::shutdown();
     return 0;
 }

@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Full System Launch File - Master launch file for the complete sort-by-weight robot system
+Sorting System Master Launch File
 
 This launch file replaces the runSimulation.sh, runHybrid.sh, and runRealRobot.sh scripts.
 
 Three modes available:
 1. SIMULATION: Fake robot + simulated perception + simulated weights
-   ros2 launch full_system.launch.py mode:=simulation
+   ros2 launch supervisor_module sorting_system.launch.py mode:=simulation
 
 2. HYBRID: Real robot + simulated perception + optional real weights
-   ros2 launch full_system.launch.py mode:=hybrid robot_ip:=192.168.0.100
+   ros2 launch supervisor_module sorting_system.launch.py mode:=hybrid robot_ip:=192.168.0.100
 
 3. REAL: Real robot + real perception (Kevin's) + real weights (Asad's)
-   ros2 launch full_system.launch.py mode:=real robot_ip:=192.168.0.100
+   ros2 launch supervisor_module sorting_system.launch.py mode:=real robot_ip:=192.168.0.100
 
 Additional options:
   - autorun:=true              Auto-start sorting without dashboard
@@ -94,12 +94,6 @@ def generate_launch_description():
     use_simulated_perception = PythonExpression(["'", mode, "' != 'real'"])
     gripper_simulation_mode = PythonExpression(["'", mode, "' == 'simulation'"])
 
-    # For real hardware, use scaled_joint_trajectory_controller
-    # For simulation, use joint_trajectory_controller
-    initial_joint_controller = PythonExpression([
-        "'scaled_joint_trajectory_controller' if '", mode, "' != 'simulation' else 'joint_trajectory_controller'"
-    ])
-
     # Find package shares
     motion_control_share = FindPackageShare('motion_control_module')
 
@@ -148,7 +142,7 @@ echo "FastDDS profile created at /tmp/fastdds_profile.xml"
                 launch_arguments={
                     'ur_type': 'ur5e',
                     'robot_ip': robot_ip,
-                    'initial_joint_controller': initial_joint_controller,
+                    'initial_joint_controller': 'joint_trajectory_controller',
                     'use_fake_hardware': use_fake_hardware,
                     'launch_rviz': 'false',
                     'description_file': 'ur5e_with_end_effector.urdf.xacro',

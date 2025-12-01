@@ -1,3 +1,4 @@
+
 # Gripper force and weight sensor feedback
 std_msgs/Header header
 float32 gripper_force     # in Newtons

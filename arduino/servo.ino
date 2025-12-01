@@ -16,7 +16,7 @@ bool isMoving = false;
 
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);  // Match ROS2 system baud rate
   myservo.attach(9);
   pos = open;  // Assume servo is at open position
   
@@ -51,9 +51,9 @@ void setup() {
   
   // Print controls
   Serial.println("=== GRIPPER CONTROLS ===");
-  Serial.println("Press 'w' to OPEN gripper");
-  Serial.println("Press 's' to CLOSE gripper");
-  Serial.println("Press 'e' to SELECT weight (10/20/50/100/200/500g)");
+  Serial.println("Send 'W' to OPEN gripper");
+  Serial.println("Send 'S' to CLOSE gripper");
+  Serial.println("Send 'E <weight>' to set grip angle (e.g. 'E 100', 'E 200', 'E 500')");
   Serial.println("========================\n");
 }
 
@@ -61,52 +61,33 @@ void loop() {
   // Check for user input
   if (Serial.available() > 0) {
     char input = Serial.read();
-    
-    if (input == 'w' && currentState != 1) {
+
+    if (input == 'W' && currentState != 1) {
       openGripper();
       currentState = 1;
-    } 
-    else if (input == 's' && currentState != 0) {
+    }
+    else if (input == 'S' && currentState != 0) {
       closeGripper();
       currentState = 0;
     }
-    else if (input == 'e' || input == 'E') {
-      selectWeight();
+    else if (input == 'E') {
+      // New protocol: "E 100", "E 200", or "E 500" as single command
+      // Wait briefly for the space and number
+      delay(10);
+      if (Serial.available() > 0 && Serial.read() == ' ') {
+        int weight = Serial.parseInt();
+        setWeightTarget(weight);
+      }
     }
   }
 }
 
-void selectWeight() {
-  Serial.println("\n=== SELECT WEIGHT ===");
-  Serial.println("Enter weight: 10, 20, 50, 100, 200, or 500 (grams)");
-  
-  // Wait for user to enter a number
-  while (Serial.available() == 0) {
-    // Wait for input
-  }
-  
-  // Read the integer from serial
-  int weight = Serial.parseInt();
-  
-  // Clear any remaining characters in the buffer
-  while (Serial.available() > 0) {
-    Serial.read();
-  }
-  
+void setWeightTarget(int weight) {
   // Map weight to closed position
   bool validWeight = true;
   int newClosed;
-  
+
   switch (weight) {
-    case 10:
-      newClosed = 0;
-      break;
-    case 20:
-      newClosed = 3;
-      break;
-    case 50:
-      newClosed = 8;
-      break;
     case 100:
       newClosed = 12;
       break;
@@ -120,14 +101,12 @@ void selectWeight() {
       validWeight = false;
       break;
   }
-  
+
   if (validWeight) {
     closed = newClosed;
-    Serial.printf("Weight set to %dg (closed position = %d)\n", weight, closed);
-    Serial.println("=====================\n");
+    Serial.printf("Grip angle set for %dg (closed position = %d)\n", weight, closed);
   } else {
-    Serial.println("ERROR: Invalid weight! Must be 10, 20, 50, 100, 200, or 500");
-    Serial.println("Weight setting unchanged.\n");
+    Serial.printf("ERROR: Invalid weight %d! Must be 100, 200, or 500\n", weight);
   }
 }
 
