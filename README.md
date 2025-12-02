@@ -311,9 +311,9 @@ Requires Universal Robots' `ur_robot_driver`.
 Current Joint Torques → Kalman Filter → Torque Deltas → Kinematics → Mass Estimate → Calibration → Output
 ```
 
-1. **Decimation**: Joint state messages arrive at ~500Hz; the node decimates to ~50Hz to reduce processing load / high frequency noise.
-2. **Baseline Calibration**: On startup (or when triggered via service), the node collects ~5 seconds of torque samples to establish a baseline with the gripper empty.
-3. **Torque Filtering**: Incoming joint torques are smoothed using per-joint Kalman filters.
+1. **Decimation**: Joint state messages from `ur_controller` arrive at ~500Hz; the node decimates to ~50Hz to reduce processing load / high frequency noise.
+2. **Torque Filtering**: Incoming joint torques are smoothed using per-joint Kalman filters.
+3. **Baseline Calibration**: On startup (or when triggered via service), the node collects ~5 seconds of torque samples to establish a baseline with the gripper empty.
 4. **Mass Estimation**: The difference between current and baseline torques is used with UR5e forward kinematics to compute moment arms, then mass is estimated via $\tau = m \times g \times r$.
 5. **Output Calibration**:
    The system now uses a polynomial gain factor of $ax^2 + bx + c$ to calibrate estimates.
