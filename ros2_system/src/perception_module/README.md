@@ -1,204 +1,170 @@
-# Perception Module – YOLO + RealSense + UR5e Coordinate Projection  
-**UNSW – MTRN4231 Robotics Project**
+# Perception Module – YOLO + RealSense + UR5e Coordinate Projection
+### UNSW – MTRN4231 Robotics Project
 
-This package performs real-time object detection of red cylindrical weights using YOLOv8, extracts precise 3D coordinates using Intel RealSense depth data, transforms them into the UR5e robot’s base frame, and publishes the estimated weight and coordinates for downstream robot control.
+This package performs real-time object detection of **red cylindrical weights** using YOLOv8, extracts precise **3D coordinates** using Intel RealSense depth, transforms them into the **UR5e base frame**, and publishes both coordinates and weight estimation to downstream robot modules.
 
 ---
 
 ## 1. System Overview
 
-Pipeline:
-
-1. RGB + aligned depth frames received from Intel RealSense D435.
+### Processing Pipeline
+1. RealSense D435 streams RGB + aligned depth.
 2. YOLOv8 detects red cylindrical weights.
-3. HSV-based top-circle refinement improves centre accuracy.
-4. RealSense depth + intrinsics convert pixel → 3D point.
-5. TF2 static transform converts camera frame → `base_link`.
-6. Publishes:
-   - 3D coordinates (`PointStamped`)
-   - Estimated weight (`String`)
-7. Displays YOLO detections + sampling pixels.
+3. Circle-refinement detects the red top knob for more accurate centre pixel.
+4. Depth + RealSense intrinsics → **3D camera frame point**.
+5. TF2 static transform → **base_link coordinates**.
+6. Node publishes:
+   - `/object_coords` (3D position)
+   - `/object_weight` (estimated weight)
+7. Live OpenCV windows display:
+   - YOLO detections  
+   - Top/table sampling points for height estimation
 
 ---
 
 ## 2. ROS2 Topics
 
-### Subscribed
+### Subscribed Topics
 | Topic | Type | Description |
 |-------|------|-------------|
-| `/camera/camera/color/image_raw` | `sensor_msgs/Image` | RGB image |
-| `/camera/camera/aligned_depth_to_color/image_raw` | `sensor_msgs/Image` | Depth image |
-| `/camera/camera/aligned_depth_to_color/camera_info` | `sensor_msgs/CameraInfo` | Camera intrinsics |
+| `/camera/camera/color/image_raw` | `sensor_msgs/Image` | RGB frame |
+| `/camera/camera/aligned_depth_to_color/image_raw` | `sensor_msgs/Image` | Depth (aligned) |
+| `/camera/camera/aligned_depth_to_color/camera_info` | `sensor_msgs/CameraInfo` | Intrinsics |
 
-### Published
+### Published Topics
 | Topic | Type | Description |
-|--------|-------|-------------|
-| `object_coords` | `geometry_msgs/PointStamped` | Object 3D position in `base_link` |
-| `object_weight` | `std_msgs/String` | Estimated weight label |
+|-------|------|-------------|
+| `object_coords` | `geometry_msgs/PointStamped` | 3D position in base_link |
+| `object_weight` | `std_msgs/String` | Estimated discrete weight |
 | TF Frames | `TransformStamped` | `base_link → yolo_object_i` |
 
 ---
 
-## 3. Calculations & Transformations
+## 3. Calculations & Coordinate Transforms
 
-### 3.1 Pixel → Depth → Camera Coordinates
-Depth smoothing:
+### 3.1 Pixel → Depth → 3D (Camera Frame)
 
+Depth patch median (smoothing):
+```python
 depth_m = median(depth_patch) * 0.001
+RealSense deprojection:
 
-makefile
+python
 Copy code
+Xo, Yo, Zo = rs2_deproject_pixel_to_point(intrinsics, (u, v), depth_m)
+Convert from optical frame → camera_link:
 
-Deprojection:
-
-Xo, Yo, Zo = rs2_deproject_pixel_to_point(intrinsics, (u,v), depth_m)
-
-sql
+ini
 Copy code
-
-Convert optical frame → camera_link:
-
 Xc = Zo
 Yc = -Xo
 Zc = -Yo
+3.2 Camera Frame → UR5e Base Frame
+Static TF:
 
-powershell
+arduino
 Copy code
+ros2 run tf2_ros static_transform_publisher 1.30938 0.0206053 0.670571 -0.398486 0.00254305 0.917119 0.00974536 base_link camera_link
+Apply transform:
 
-### 3.2 Camera → base_link Transform
-
-Static TF launch:
-
-ros2 run tf2_ros static_transform_publisher <x y z qx qy qz qw> base_link camera_link
-
-css
+python
 Copy code
-
-Transform:
-
 pt_base = do_transform_point(pt_cam, tf)
+Coordinates in base_link (meters) are published.
 
-yaml
+4. Weight Estimation Logic
+Object height is computed from depth:
+
+ini
 Copy code
-
-Coordinates then published in metres.
-
----
-
-## 4. Weight Estimation Logic
-
-Depth difference between top sample pixel and table sample pixel:
-
 height_m = depth_table - depth_top
+Threshold → weight:
 
-yaml
+Height (m)	Weight
+≥ 0.090	500 g
+≥ 0.070	200 g
+≥ 0.055	100 g
+≥ 0.040	50 g
+≥ 0.030	20 g
+< 0.030	10 g
+
+These thresholds must be tuned using real measurements.
+
+5. Visual Outputs
+OpenCV Windows:
+YOLO Detection
+Bounding boxes, centre points, top-circle radius
+
+Height Sampling Pixels
+Shows which pixels were used to calculate height
+
+TF Tree in RViz:
+cpp
 Copy code
-
-Threshold → label mapping:
-
-| Height (m) | Weight |
-|------------|---------|
-| ≥ 0.090 | 500 g |
-| ≥ 0.070 | 200 g |
-| ≥ 0.055 | 100 g |
-| ≥ 0.040 | 50 g |
-| ≥ 0.030 | 20 g |
-| < 0.030 | 10 g |
-
----
-
-## 5. Visual Outputs
-
-OpenCV windows:
-- **"YOLO Detection"** – bounding boxes, centres, radius overlay  
-- **"Height Sampling Pixels"** – shows top & table sampling positions
-
-TF tree (RViz):
-
 base_link
-↑ camera_link (static)
-↑ yolo_object_0...N
-
-yaml
+   └── camera_link (static)
+         └── yolo_object_0
+         └── yolo_object_1
+         └── ...
+6. How to Run
+A) Recommended (Launch File)
+nginx
 Copy code
-
----
-
-## 6. How to Run
-
-### A. Using Launch File (Recommended)
-
 ros2 launch perception_module object_detect.launch.py
+Your launch file automatically:
 
-mathematica
+Starts RealSense
+
+Publishes static TF
+
+Launches YOLO node
+
+B) Manual Run
+1. Start RealSense:
+go
 Copy code
-
-### B. Manual Run
-
-**1. Launch RealSense**
-
-ros2 launch realsense2_camera rs_launch.py
-align_depth.enable:=true enable_color:=true enable_depth:=true pointcloud.enable:=true
-
-markdown
+ros2 launch realsense2_camera rs_launch.py align_depth.enable:=true enable_color:=true enable_depth:=true pointcloud.enable:=true
+2. Publish TF:
+arduino
 Copy code
-
-**2. Publish TF**
-
-ros2 run tf2_ros static_transform_publisher
-1.30938 0.0206053 0.670571
--0.398486 0.00254305 0.917119 0.00974536
-base_link camera_link
-
-markdown
+ros2 run tf2_ros static_transform_publisher 1.30938 0.0206053 0.670571 -0.398486 0.00254305 0.917119 0.00974536 base_link camera_link
+3. Run YOLO Node:
+bash
 Copy code
-
-**3. Run YOLO node**
-
 colcon build
 source install/setup.bash
 
-ros2 run perception_module object_detect_yolo
---ros-args
--p yolo_weights:=/runs/detect/train/weights/best.pt
--p target_class_name:=red_object
-
-yaml
+ros2 run perception_module object_detect_yolo \
+  --ros-args \
+  -p yolo_weights:=/runs/detect/train/weights/best.pt \
+  -p target_class_name:=red_object
+7. Package Structure
+arduino
 Copy code
-
----
-
-## 7. Package Structure
-
 perception_module/
-├── perception_module/
-│ ├── object_detect_yolo.py
-├── launch/
-│ ├── object_detect.launch.py
-├── params/
-├── rviz/
+│── perception_module/
+│   ├── object_detect_yolo.py
+│── launch/
+│   ├── object_detect.launch.py
+│── params/
+│── rviz/
 ├── setup.py
 ├── package.xml
 └── README.md
+8. Known Issues & Assumptions
+Depth noise affects height estimation.
 
-yaml
-Copy code
+Shiny metal knob requires top_offset_px tuning.
 
----
+YOLO model must be trained only on red weights.
 
-## 8. Known Issues & Assumptions
+Static TF must accurately represent real camera mounting.
 
-- Weight estimation depends on depth accuracy.
-- Shiny metal knob requires offset tuning (`top_offset_px`).
-- Static TF must match real camera mounting.
-- YOLO model must be trained only on red weights.
-- Depth alignment is required (`align_depth.enable:=true`).
-- Table must appear flat in transformation — large TF errors will tilt it.
+Table must be planar for correct Z estimation.
 
----
+Requires depth alignment: align_depth.enable:=true.
 
-## 9. Author
-
-**Kevin Lloyd Lazaro**  
-MTRN4231 Robotics Project – UNSW Sydney  
+9. Author
+Kevin Lloyd Lazaro
+UNSW Sydney – MTRN4231 Robotics Project
 Perception & Computer Vision Lead
