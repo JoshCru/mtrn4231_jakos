@@ -178,5 +178,5 @@ perception_module/
 
 ## 9. Author
 Kevin Lloyd Lazaro
-Perception Lead – MTRN4231 Robotics Project
+
 UNSW Sydney
