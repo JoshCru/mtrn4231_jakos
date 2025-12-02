@@ -149,6 +149,7 @@ Your launch file automatically:
 ros2 launch realsense2_camera rs_launch.py align_depth.enable:=true enable_color:=true enable_depth:=true pointcloud.enable:=true
 ```
 2. Publish TF:
+
 Replace X Y Z QX QY QZ QW with the measured transform from base_link → camera_link
 ```arduino
 ros2 run tf2_ros static_transform_publisher 1.30938 0.0206053 0.670571 -0.398486 0.00254305 0.917119 0.00974536 base_link camera_link
