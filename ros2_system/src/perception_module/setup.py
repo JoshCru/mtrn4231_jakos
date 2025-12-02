@@ -27,6 +27,7 @@ setup(
     entry_points={
         'console_scripts': [
             'object_detect_yolo = perception_module.object_detect_yolo:main',
+            'object_detect_yolo2 = perception_module.object_detect_yolo2:main',
         ],
     },
 )
