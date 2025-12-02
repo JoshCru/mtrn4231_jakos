@@ -177,5 +177,5 @@ perception_module/
 - Requires depth alignment: align_depth.enable:=true.
 
 ## 9. Author
-Kevin Lloyd Lazaro /n
+Kevin Lloyd Lazaro \n
 UNSW Sydney
