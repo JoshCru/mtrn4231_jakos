@@ -149,14 +149,17 @@ ros2 run perception_module object_detect_yolo \
 ## 7. Package Structure
 ```arduino
 perception_module/
-│── perception_module/
+├── perception_module/
 │   ├── object_detect_yolo.py
-│── launch/
+├── launch/
 │   ├── object_detect.launch.py
-│── params/
-│── rviz/
-├── setup.py
+├── red_object.v3/        # YOLO dataset
+├── runs/detect/trainXX/  # Trained YOLO weights
+├── resource/
+├── test/
+├── best.pt               # YOLO trained weights
 ├── package.xml
+├── setup.py
 └── README.md
 ```
 
@@ -176,6 +179,7 @@ perception_module/
 ## 9. Author
 Kevin Lloyd Lazaro
 UNSW Sydney
+
 
 
 
