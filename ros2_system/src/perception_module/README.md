@@ -171,6 +171,7 @@ ros2 run perception_module object_detect_yolo \
 perception_module/
 ├── perception_module/
 │   ├── object_detect_yolo.py
+│   ├── object_detect_yolo2.py
 ├── launch/
 │   ├── object_detect.launch.py
 ├── red_object.v3/        # YOLO dataset
