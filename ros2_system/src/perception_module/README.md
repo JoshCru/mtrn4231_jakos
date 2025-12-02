@@ -47,37 +47,43 @@ This package performs real-time object detection of **red cylindrical weights** 
 Depth patch median (smoothing):
 ```python
 depth_m = median(depth_patch) * 0.001
+```
+
 RealSense deprojection:
 
-python
-Copy code
+```python
 Xo, Yo, Zo = rs2_deproject_pixel_to_point(intrinsics, (u, v), depth_m)
+```
+
 Convert from optical frame → camera_link:
 
-ini
-Copy code
+```python
 Xc = Zo
 Yc = -Xo
 Zc = -Yo
+```
+
 3.2 Camera Frame → UR5e Base Frame
 Static TF:
 
-arduino
-Copy code
+```python
 ros2 run tf2_ros static_transform_publisher 1.30938 0.0206053 0.670571 -0.398486 0.00254305 0.917119 0.00974536 base_link camera_link
+```
+
 Apply transform:
 
-python
-Copy code
+```python
 pt_base = do_transform_point(pt_cam, tf)
+```
+
 Coordinates in base_link (meters) are published.
 
 4. Weight Estimation Logic
 Object height is computed from depth:
 
-ini
-Copy code
+```ini
 height_m = depth_table - depth_top
+```
 Threshold → weight:
 
 Height (m)	Weight
@@ -168,3 +174,4 @@ Requires depth alignment: align_depth.enable:=true.
 Kevin Lloyd Lazaro
 UNSW Sydney – MTRN4231 Robotics Project
 Perception & Computer Vision Lead
+
