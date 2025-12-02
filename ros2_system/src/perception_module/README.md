@@ -179,6 +179,3 @@ perception_module/
 ## 9. Author
 Kevin Lloyd Lazaro
 UNSW Sydney
-
-
-
