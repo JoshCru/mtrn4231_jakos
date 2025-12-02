@@ -63,7 +63,7 @@ Yc = -Xo
 Zc = -Yo
 ```
 
-3.2 Camera Frame → UR5e Base Frame
+### 3.2 Camera Frame → UR5e Base Frame
 Static TF:
 
 ```python
@@ -78,7 +78,7 @@ pt_base = do_transform_point(pt_cam, tf)
 
 Coordinates in base_link (meters) are published.
 
-4. Weight Estimation Logic
+## 4. Weight Estimation Logic
 Object height is computed from depth:
 
 ```ini
@@ -86,67 +86,70 @@ height_m = depth_table - depth_top
 ```
 Threshold → weight:
 
-Height (m)	Weight
-≥ 0.090	500 g
-≥ 0.070	200 g
-≥ 0.055	100 g
-≥ 0.040	50 g
-≥ 0.030	20 g
-< 0.030	10 g
+| Height (m) | Weight |
+| ---------- | ------ |
+| ≥ 0.090    | 500 g  |
+| ≥ 0.070    | 200 g  |
+| ≥ 0.055    | 100 g  |
+| ≥ 0.040    | 50 g   |
+| ≥ 0.030    | 20 g   |
+| < 0.030    | 10 g   |
 
 These thresholds must be tuned using real measurements.
 
-5. Visual Outputs
+## 5. Visual Outputs
 OpenCV Windows:
-YOLO Detection
-Bounding boxes, centre points, top-circle radius
+- YOLO Detection
+  Bounding boxes, centre points, top-circle radius
 
-Height Sampling Pixels
-Shows which pixels were used to calculate height
+- Height Sampling Pixels
+  Shows which pixels were used to calculate height
 
 TF Tree in RViz:
-cpp
+
+```cpp
 Copy code
 base_link
    └── camera_link (static)
          └── yolo_object_0
          └── yolo_object_1
          └── ...
-6. How to Run
-A) Recommended (Launch File)
-nginx
-Copy code
+```
+
+## 6. How to Run
+### A) Recommended (Launch File)
+```nginx
 ros2 launch perception_module object_detect.launch.py
+```
 Your launch file automatically:
 
-Starts RealSense
+- Starts RealSense
 
-Publishes static TF
+- Publishes static TF
 
-Launches YOLO node
+- Launches YOLO node
 
-B) Manual Run
+### B) Manual Run
 1. Start RealSense:
-go
-Copy code
+```go
 ros2 launch realsense2_camera rs_launch.py align_depth.enable:=true enable_color:=true enable_depth:=true pointcloud.enable:=true
+```
 2. Publish TF:
-arduino
-Copy code
+```arduino
 ros2 run tf2_ros static_transform_publisher 1.30938 0.0206053 0.670571 -0.398486 0.00254305 0.917119 0.00974536 base_link camera_link
+```
 3. Run YOLO Node:
-bash
-Copy code
+```bash
 colcon build
 source install/setup.bash
-
 ros2 run perception_module object_detect_yolo \
   --ros-args \
   -p yolo_weights:=/runs/detect/train/weights/best.pt \
   -p target_class_name:=red_object
-7. Package Structure
-arduino
-Copy code
+```
+
+## 7. Package Structure
+```arduino
 perception_module/
 │── perception_module/
 │   ├── object_detect_yolo.py
@@ -157,21 +160,23 @@ perception_module/
 ├── setup.py
 ├── package.xml
 └── README.md
-8. Known Issues & Assumptions
-Depth noise affects height estimation.
+```
 
-Shiny metal knob requires top_offset_px tuning.
+## 8. Known Issues & Assumptions
+- Depth noise affects height estimation.
 
-YOLO model must be trained only on red weights.
+- Shiny metal knob requires top_offset_px tuning.
 
-Static TF must accurately represent real camera mounting.
+- YOLO model must be trained only on red weights.
 
-Table must be planar for correct Z estimation.
+- Static TF must accurately represent real camera mounting.
 
-Requires depth alignment: align_depth.enable:=true.
+- Table must be planar for correct Z estimation.
 
-9. Author
+- Requires depth alignment: align_depth.enable:=true.
+
+## 9. Author
 Kevin Lloyd Lazaro
-UNSW Sydney – MTRN4231 Robotics Project
-Perception & Computer Vision Lead
+UNSW Sydney
+
 
