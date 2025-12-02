@@ -27,7 +27,7 @@ class YOLObjectDetect(Node):
 
         # ---------- Parameters ----------
         default_weights = os.path.expanduser(
-            '~/Downloads/perception_module_10/perception_module/lab3-main/src/object_detect/best.pt'
+            '/home/mtrn/mtrn4231_jakos/ros2_system/src/perception_module/best.pt'
         )
         self.declare_parameter('yolo_weights', default_weights)
         self.declare_parameter('conf_thres', 0.25)
@@ -288,17 +288,17 @@ class YOLObjectDetect(Node):
         """
         # TODO: replace these with real measured heights for your weights
         if height_m > 0.040:      # > 4.0 cm
-            return "500 g"
+            return 500
         elif height_m > 0.030:    # 3–4 cm
-            return "200 g"
+            return 200
         elif height_m > 0.025:    # 2.5–3 cm
-            return "100 g"
+            return 100
         elif height_m > 0.020:    # 2–2.5 cm
-            return "50 g"
+            return 50
         elif height_m > 0.015:    # 2–1.5 cm
-            return "20 g"
+            return 20
         else:
-            return "10 g"
+            return 10
 
     def refine_center_with_circle(self, img, x1, y1, x2, y2):
         """
