@@ -87,6 +87,8 @@ pt_base = do_transform_point(pt_cam, tf)
 
 Coordinates in base_link (meters) are published.
 
+---
+
 ## 4. Weight Estimation Logic
 Object height is computed from depth:
 
@@ -106,6 +108,8 @@ Threshold → weight:
 
 These thresholds must be tuned using real measurements.
 
+---
+
 ## 5. Visual Outputs
 OpenCV Windows:
 - YOLO Detection
@@ -123,6 +127,8 @@ base_link
          └── yolo_object_1
          └── ...
 ```
+
+---
 
 ## 6. How to Run
 ### A) Recommended (Launch File)
@@ -156,6 +162,8 @@ ros2 run perception_module object_detect_yolo \
   -p target_class_name:=red_object
 ```
 
+---
+
 ## 7. Package Structure
 ```arduino
 perception_module/
@@ -173,6 +181,8 @@ perception_module/
 └── README.md
 ```
 
+---
+
 ## 8. Known Issues & Assumptions
 - Depth noise affects height estimation.
 
@@ -185,6 +195,8 @@ perception_module/
 - Table must be planar for correct Z estimation.
 
 - Requires depth alignment: align_depth.enable:=true.
+
+---
 
 ## 9. Author
 Kevin Lloyd Lazaro
