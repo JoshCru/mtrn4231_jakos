@@ -13,8 +13,8 @@ This package performs real-time object detection of **red cylindrical weights** 
 4. Depth + RealSense intrinsics → **3D camera frame point**.
 5. TF2 static transform → **base_link coordinates**.
 6. Node publishes:
-   - `/object_coords` (3D position)
-   - `/object_weight` (estimated weight)
+   - `/object_coords` (3D position in `base_link`, meters)
+   - `/object_weight` (UR-base coordinates in mm + estimated weight in grams)
 7. Live OpenCV windows display:
    - YOLO detections  
    - Top/table sampling points for height estimation
@@ -31,11 +31,21 @@ This package performs real-time object detection of **red cylindrical weights** 
 | `/camera/camera/aligned_depth_to_color/camera_info` | `sensor_msgs/CameraInfo` | Intrinsics |
 
 ### Published Topics
-| Topic | Type | Description |
-|-------|------|-------------|
-| `object_coords` | `geometry_msgs/PointStamped` | 3D position in base_link |
-| `object_weight` | `std_msgs/String` | Estimated discrete weight |
-| TF Frames | `TransformStamped` | `base_link → yolo_object_i` |
+| Topic          | Type                      | Description |
+|----------------|---------------------------|-------------|
+| `object_coords`| `geometry_msgs/PointStamped` | 3D position in `base_link` (m) |
+| `object_weight`| `std_msgs/String`         | Combined UR-base coordinates and weight in grams, encoded as `x_mm,y_mm,z_mm,weight_g` |
+| TF Frames      | `TransformStamped`        | `base_link → yolo_object_i` (debug only) |
+
+The `object_weight` string is formatted as:
+
+```text
+x_mm,y_mm,z_mm,weight_g
+```
+For example:
+```text
+210.5,-145.2,85.0,200
+```
 
 ---
 
