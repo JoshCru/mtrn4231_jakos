@@ -12,6 +12,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from rclpy.node import Node
 from rclpy.time import Time
 from sensor_msgs.msg import Image, CameraInfo
+from std_msgs.msg import String
 from geometry_msgs.msg import TransformStamped
 from geometry_msgs.msg import PointStamped
 from tf2_geometry_msgs import do_transform_point
@@ -27,7 +28,7 @@ class YOLObjectDetect(Node):
 
         # ---------- Parameters ----------
         default_weights = os.path.expanduser(
-            '~/Downloads/perception_module_10/perception_module/lab3-main/src/object_detect/best.pt'
+            '/home/mtrn/mtrn4231_jakos/ros2_system/src/perception_module/best.pt'
         )
         self.declare_parameter('yolo_weights', default_weights)
         self.declare_parameter('conf_thres', 0.25)
@@ -61,17 +62,15 @@ class YOLObjectDetect(Node):
         self.marker_regions = {}
 
         # ---------- Marker -> UR base coordinates (mm) ----------
-        # TODO: measure these once with the UR pendant and fill in real values.
-        # Example placeholders:
+        # TODO: replace placeholders with real UR pendant measurements
         self.marker_to_ur_mm = {
-            1: np.array([ 200.0, -300.0, 100.0]),  # pick zone 1
-            2: np.array([ 200.0, -200.0, 100.0]),  # pick zone 2
-            3: np.array([ 200.0, -100.0, 100.0]),  # pick zone 3
-            4: np.array([ 200.0,    0.0, 100.0]),  # pick zone 4
-            5: np.array([ 400.0, -200.0, 100.0]),  # sorting bin A
-            6: np.array([ 400.0,    0.0, 100.0]),  # sorting bin B
+            1: np.array([200.0, -300.0, 100.0]),  # pick zone 1
+            2: np.array([200.0, -200.0, 100.0]),  # pick zone 2
+            3: np.array([200.0, -100.0, 100.0]),  # pick zone 3
+            4: np.array([200.0,    0.0, 100.0]),  # pick zone 4
+            5: np.array([400.0, -200.0, 100.0]),  # sorting bin A
+            6: np.array([400.0,    0.0, 100.0]),  # sorting bin B
         }
-
 
         # ---------- Depth camera subscriptions ----------
         self.image_sub = self.create_subscription(
@@ -98,10 +97,26 @@ class YOLObjectDetect(Node):
         self.cv_image = None
         self.cv_bridge = CvBridge()
 
-        # ---------- TF ----------
+        # ---------- TF (currently unused, but kept for future) ----------
         self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
+
+        # ---------- Publishers for other nodes ----------
+        # 3D position in base_link (meters) – from ArUco zone centres (mm -> m)
+        self.coord_pub = self.create_publisher(
+            PointStamped,
+            'object_coords',
+            10
+        )
+
+        # Combined info: x_mm, y_mm, z_mm, weight_g (as CSV string)
+        # Format: "x_mm,y_mm,z_mm,weight_g"
+        self.info_pub = self.create_publisher(
+            String,
+            'object_weight',
+            10
+        )
 
         # ---------- Load YOLO ----------
         self.get_logger().info(f'Loading YOLO weights: {weights_path}')
@@ -152,7 +167,7 @@ class YOLObjectDetect(Node):
             self.depth_image = self.cv_bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
         except Exception as e:
             self.get_logger().error(f"Error in arm_depth_callback: {str(e)}")
-    
+
     def get_view_ray(self, u, v):
         fx = self.intrinsics.fx
         fy = self.intrinsics.fy
@@ -178,29 +193,15 @@ class YOLObjectDetect(Node):
         if not (0 <= u < w and 0 <= v < h):
             return None
 
-        #self.get_logger().info(f"depth dtype={self.depth_image.dtype}, sample={self.depth_image[v, u]}")  # depth value check in mm or m
-        
-        #depth_val_m = float(self.depth_image[v, u]) * 0.001  # depth in mm -> m
-        
         # Depth smoothing window
-        kernel = 5 # 3 or 5 are typical
-        v1 = max(0, v - kernel//2)
-        v2 = min(self.depth_image.shape[0], v + kernel//2 + 1)
-        u1 = max(0, u - kernel//2)
-        u2 = min(self.depth_image.shape[1], u + kernel//2 + 1)
+        kernel = 5  # 3 or 5 are typical
+        v1 = max(0, v - kernel // 2)
+        v2 = min(self.depth_image.shape[0], v + kernel // 2 + 1)
+        u1 = max(0, u - kernel // 2)
+        u2 = min(self.depth_image.shape[1], u + kernel // 2 + 1)
 
         window = self.depth_image[v1:v2, u1:u2]
-        depth_val_m = float(np.median(window)) * 0.001
-        
-        # depth correction (meters)
-        #depth_correction = 0  # 10 mm, adjust as needed
-
-        # compute view ray
-        #ray = self.get_view_ray(u, v)  # unit vector in OPTICAL frame
-
-        # apply depth correction along ray
-        #depth_val_m_corrected = depth_val_m - depth_correction
-        #depth_val_m_corrected = max(depth_val_m_corrected, 0.0)
+        depth_val_m = float(np.median(window)) * 0.001  # mm -> m
 
         if depth_val_m <= 0.0 or np.isnan(depth_val_m):
             return None
@@ -247,6 +248,10 @@ class YOLObjectDetect(Node):
         Estimate cylinder height in meters using depth.
         We sample one point slightly below the top of the bbox for the object,
         and one point below the bottom of the bbox for the table.
+
+        Returns:
+            None if estimation fails
+            OR (height_m, (u_top, v_top), (u_table, v_table))
         """
         if self.depth_image is None:
             return None
@@ -256,7 +261,7 @@ class YOLObjectDetect(Node):
         # horizontal centre of the object
         u_center = int((x1 + x2) / 2.0)
 
-        # pixel for "top" of object: just below top edge of bbox (avoid shiny knob)
+        # pixel for "top" of object: just below top edge of bbox
         v_top = int(y1) + self.top_offset_px
         v_top = max(0, min(h - 1, v_top))
 
@@ -271,15 +276,15 @@ class YOLObjectDetect(Node):
             self.get_logger().warn("Height estimation: invalid depth (top or table)")
             return None
 
-        # Table is further from the camera than the top of the object
         height_m = depth_table - depth_top
 
-        # sanity check
-        if height_m <= 0.0 or height_m > 0.5:  # 0.5 m upper bound just to catch nonsense
+        if height_m <= 0.0 or height_m > 0.5:
             self.get_logger().warn(f"Height estimation suspicious: {height_m:.3f} m")
             return None
 
-        return height_m
+        # return height + the two sampling pixels
+        return height_m, (u_center, v_top), (u_center, v_table)
+
 
     def refine_center_with_circle(self, img, x1, y1, x2, y2):
         """
@@ -294,7 +299,6 @@ class YOLObjectDetect(Node):
         y2i = min(h - 1, int(y2))
 
         if x2i <= x1i or y2i <= y1i:
-            # degenerate box – fallback
             u = int((x1 + x2) / 2.0)
             v = int((y1 + y2) / 2.0)
             return u, v, 0
@@ -320,7 +324,6 @@ class YOLObjectDetect(Node):
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
                                        cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
-            # if we fail to find a contour, fallback to bbox centre
             u = int((x1 + x2) / 2.0)
             v = int((y1 + y2) / 2.0)
             return u, v, 0
@@ -336,45 +339,34 @@ class YOLObjectDetect(Node):
 
         return u, v, r_px
 
-
     def estimate_weight_from_height(self, height_m):
         """
-        Map a measured height (in meters) to a weight label.
+        Map a measured height (in meters) to a numeric weight in grams.
         >>> YOU MUST TUNE THESE THRESHOLDS BASED ON YOUR ACTUAL WEIGHTS. <<<
         """
-        # TODO: replace these with real measured heights for your weights
-        if height_m > 0.090:      # > 9.0 cm
-            return "500 g"
-        elif height_m > 0.070:    # 7–9 cm
-            return "200 g"
-        elif height_m > 0.055:    # 5.5–7 cm
-            return "100 g"
-        elif height_m > 0.040:    # 4–5.5 cm
-            return "50 g"
-        elif height_m > 0.030:    # 3–4 cm
-            return "20 g"
+        if height_m > 0.040:
+            return 500
+        elif height_m > 0.030:
+            return 200
+        elif height_m > 0.025:
+            return 100
+        elif height_m > 0.020:
+            return 50
+        elif height_m > 0.015:
+            return 20
         else:
-            return "10 g"
+            return 10
 
-    # ----------------- Helper: quaternion -> rotation matrix -----------------
-   # @staticmethod
-   # def quaternion_to_rotation_matrix(qx, qy, qz, qw):
-       # norm = np.sqrt(qx*qx + qy*qy + qz*qz + qw*qw)
-       # if norm == 0.0:
-         #   return np.eye(3)
-       # x, y, z, w = qx/norm, qy/norm, qz/norm, qw/norm
-       # return np.array([
-        #    [1 - 2*(y*y + z*z),     2*(x*y - z*w),         2*(x*z + y*w)],
-        #    [2*(x*y + z*w),         1 - 2*(x*x + z*z),     2*(y*z - x*w)],
-         #   [2*(x*z - y*w),         2*(y*z + x*w),         1 - 2*(x*x + y*y)]
-       # ])
-
-    # ----------------- Main routine: YOLO + depth -----------------
+    # ----------------- Main routine: YOLO + depth + ArUco -----------------
     def routine_callback(self):
         if self.cv_image is None or self.depth_image is None or self.intrinsics is None:
             return
 
         img = self.cv_image.copy()
+
+        top_px = None
+        table_px = None
+
         # --- Detect ArUco markers on this frame ---
         self.marker_regions.clear()
         corners, ids, _ = self.aruco_detector.detectMarkers(img)
@@ -401,7 +393,7 @@ class YOLObjectDetect(Node):
                     1,
                 )
 
-
+        # --- YOLO detection ---
         try:
             results = self.model.predict(img, conf=self.conf_thres, verbose=False)[0]
         except Exception as e:
@@ -411,7 +403,11 @@ class YOLObjectDetect(Node):
         if results.boxes is None or len(results.boxes) == 0:
             if self.debug_view:
                 cv2.imshow("YOLO Detection", img)
-                cv2.waitKey(1)
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord('q'):
+                    self.get_logger().info("q pressed, shutting down node.")
+                    rclpy.shutdown()
+                    cv2.destroyAllWindows()
             return
 
         for i, box in enumerate(results.boxes):
@@ -424,22 +420,22 @@ class YOLObjectDetect(Node):
 
             x1, y1, x2, y2 = box.xyxy[0].tolist()
 
-            # If you added refine_center_with_circle earlier, use that:
-            # u, v, r_px = self.refine_center_with_circle(img, x1, y1, x2, y2)
-            u = int((x1 + x2) / 2.0)
-            v = int((y1 + y2) / 2.0)
+            # Use red-circle refinement to get a better centre
+            u, v, r_px = self.refine_center_with_circle(img, x1, y1, x2, y2)
 
-            # ---- Estimate cylinder height & weight from depth (before TF) ----
-            height_m = self.estimate_height_m(x1, y1, x2, y2)
-            weight_label = None
-            if height_m is not None:
-                weight_label = self.estimate_weight_from_height(height_m)
-                self.get_logger().info(
-                    f"Estimated height: {height_m*1000.0:.1f} mm, "
-                    f"estimated weight: {weight_label}"
-                )
+            # ---- Estimate cylinder height & weight from depth ----
+           height_result = self.estimate_height_m(x1, y1, x2, y2)
+           weight_g = None
+           if height_result is not None:
+               height_m, top_px, table_px = height_result
+               weight_g = self.estimate_weight_from_height(height_m)
+               self.get_logger().info(
+                   f"Estimated height: {height_m*1000.0:.1f} mm, "
+                   f"estimated weight: {weight_g} g"
+               )
 
-            # ---- ArUco-based zone detection (no TF needed) ----
+
+            # ---- ArUco-based zone detection (discrete UR target) ----
             zone_marker = None
             for marker_id, (mx1, my1, mx2, my2) in self.marker_regions.items():
                 if mx1 <= u <= mx2 and my1 <= v <= my2:
@@ -455,15 +451,44 @@ class YOLObjectDetect(Node):
                         f"Marker-based UR target (mm) for marker {zone_marker}: "
                         f"X={ur_xyz_mm[0]:.1f}, Y={ur_xyz_mm[1]:.1f}, Z={ur_xyz_mm[2]:.1f}"
                     )
+
+                    # --- Publish PointStamped in meters (base_link) ---
+                    pt_msg = PointStamped()
+                    pt_msg.header.stamp = self.get_clock().now().to_msg()
+                    pt_msg.header.frame_id = "base_link"  # treat as UR base
+                    pt_msg.point.x = float(ur_xyz_mm[0] / 1000.0)
+                    pt_msg.point.y = float(ur_xyz_mm[1] / 1000.0)
+                    pt_msg.point.z = float(ur_xyz_mm[2] / 1000.0)
+                    self.coord_pub.publish(pt_msg)
+
+                    # --- Publish combined info: x_mm,y_mm,z_mm,weight_g ---
+                    info = String()
+                    if weight_g is not None:
+                        info.data = (
+                            f"{ur_xyz_mm[0]:.1f},"
+                            f"{ur_xyz_mm[1]:.1f},"
+                            f"{ur_xyz_mm[2]:.1f},"
+                            f"{weight_g}"
+                        )
+                    else:
+                        # -1 = unknown weight
+                        info.data = (
+                            f"{ur_xyz_mm[0]:.1f},"
+                            f"{ur_xyz_mm[1]:.1f},"
+                            f"{ur_xyz_mm[2]:.1f},-1"
+                        )
+                    self.info_pub.publish(info)
+
             else:
                 self.get_logger().warn("Object not over any known ArUco marker zone")
 
+            # ---- Draw BLUE bounding box + centre dot ----
+            cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)),
+                          (255, 0, 0), 1)  # Bounding Box
+            cv2.circle(img, (u, v), 4, (255, 0, 0), -1)  # Centroid Circle
 
-            # ---- Draw BLUE bounding box + circle ----
-            cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 1) #Bounding Box
-            cv2.circle(img, (u, v), 4, (255, 0, 0), -1) #Centorid Circle
-            if weight_label is not None:
-                label_text = f"{cls_name} {conf:.2f} {weight_label}"
+            if weight_g is not None:
+                label_text = f"{cls_name} {conf:.2f} {weight_g}g"
             else:
                 label_text = f"{cls_name} {conf:.2f}"
 
@@ -475,11 +500,39 @@ class YOLObjectDetect(Node):
                 0.5,
                 (0, 255, 255),
                 1,
-            )#Object CLass - Text
+            )
 
         if self.debug_view:
+            # Main YOLO view
             cv2.imshow("YOLO Detection", img)
-            cv2.waitKey(1)
+
+            # Second window: show TOP / TABLE sampling pixels for height estimation
+            height_debug = img.copy()
+            for (px, label, color) in [
+                (top_px, "TOP",   (0, 0, 255)),     # red
+                (table_px, "TABLE", (255, 0, 255)), # magenta
+            ]:
+                if px is not None:
+                    cv2.circle(height_debug, px, 5, color, -1)
+                    cv2.putText(
+                        height_debug,
+                        label,
+                        (px[0] + 5, px[1] - 5),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6,
+                        color,
+                        1,
+                    )
+
+            cv2.imshow("Height Sampling Pixels", height_debug)
+
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
+                self.get_logger().info("q pressed, shutting down node.")
+                rclpy.shutdown()
+                cv2.destroyAllWindows()
+
+
 
 def main():
     rclpy.init()
@@ -494,3 +547,10 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+#def callback(msg: String):
+    #x_mm, y_mm, z_mm, weight_g = msg.data.split(',')
+    #x_mm = float(x_mm)
+    #y_mm = float(y_mm)
+    #z_mm = float(z_mm)
+    #weight_g = int(weight_g)
