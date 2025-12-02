@@ -87,12 +87,12 @@ Threshold → weight:
 
 | Height (m) | Weight |
 | ---------- | ------ |
-| ≥ 0.090    | 500 g  |
-| ≥ 0.070    | 200 g  |
-| ≥ 0.055    | 100 g  |
-| ≥ 0.040    | 50 g   |
-| ≥ 0.030    | 20 g   |
-| < 0.030    | 10 g   |
+| ≥ 0.040    | 500 g  |
+| ≥ 0.030    | 200 g  |
+| ≥ 0.025    | 100 g  |
+| ≥ 0.020    | 50 g   |
+| ≥ 0.015    | 20 g   |
+| < 0.015    | 10 g   |
 
 These thresholds must be tuned using real measurements.
 
