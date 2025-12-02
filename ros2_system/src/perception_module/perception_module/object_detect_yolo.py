@@ -287,15 +287,15 @@ class YOLObjectDetect(Node):
         >>> YOU MUST TUNE THESE THRESHOLDS BASED ON YOUR ACTUAL WEIGHTS. <<<
         """
         # TODO: replace these with real measured heights for your weights
-        if height_m > 0.090:      # > 9.0 cm
+        if height_m > 0.040:      # > 4.0 cm
             return "500 g"
-        elif height_m > 0.070:    # 7–9 cm
-            return "200 g"
-        elif height_m > 0.055:    # 5.5–7 cm
-            return "100 g"
-        elif height_m > 0.040:    # 4–5.5 cm
-            return "50 g"
         elif height_m > 0.030:    # 3–4 cm
+            return "200 g"
+        elif height_m > 0.025:    # 2.5–3 cm
+            return "100 g"
+        elif height_m > 0.020:    # 2–2.5 cm
+            return "50 g"
+        elif height_m > 0.015:    # 2–1.5 cm
             return "20 g"
         else:
             return "10 g"
@@ -324,9 +324,9 @@ class YOLObjectDetect(Node):
         hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
 
         # Two ranges for red (wraps around 180)
-        lower_red1 = np.array([0, 80, 50])
+        lower_red1 = np.array([0, 50, 50])  # Adjusted S/V range
         upper_red1 = np.array([10, 255, 255])
-        lower_red2 = np.array([160, 80, 50])
+        lower_red2 = np.array([160, 50, 50])
         upper_red2 = np.array([180, 255, 255])
 
         mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
@@ -337,21 +337,29 @@ class YOLObjectDetect(Node):
         mask = cv2.medianBlur(mask, 5)
 
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
-                                       cv2.CHAIN_APPROX_SIMPLE)
+                                    cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
             # if we fail to find a contour, fallback to bbox centre
             u = int((x1 + x2) / 2.0)
             v = int((y1 + y2) / 2.0)
             return u, v, 0
 
-        # Take the largest red blob (should be the weight top)
+        # Find the largest red contour (should be the weight top)
         c = max(contours, key=cv2.contourArea)
         (cx, cy), r = cv2.minEnclosingCircle(c)
+
+        # Optional: filter out contours that are too small
+        if r < 5:  # Minimum radius (adjust depending on your object's size)
+            return int((x1 + x2) / 2.0), int((y1 + y2) / 2.0), 0
 
         # Convert ROI coordinates back to full-image coordinates
         u = int(x1i + cx)
         v = int(y1i + cy)
         r_px = int(r)
+
+        # Apply an offset to move the centroid upwards
+        vertical_offset = 10  # Move centroid 10 pixels up
+        v = max(0, v - vertical_offset)  # Ensure that we don't go out of bounds
 
         return u, v, r_px
 
@@ -460,8 +468,8 @@ class YOLObjectDetect(Node):
                 z_b = pt_base.point.z
 
                 # convert to mm for UR pendant
-                x_mm = -x_b * 1000.0
-                y_mm = -y_b * 1000.0
+                x_mm = -x_b * 1000.0 - 20.0
+                y_mm = -y_b * 1000.0 + 8.0
                 z_b = z_b + 0.04
                 z_mm = z_b * 1000.0
 
