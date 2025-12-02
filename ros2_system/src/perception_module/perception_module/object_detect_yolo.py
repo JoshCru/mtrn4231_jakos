@@ -383,6 +383,9 @@ class YOLObjectDetect(Node):
 
         img = self.cv_image.copy()
 
+        top_px = None
+        table_px = None
+
         try:
             results = self.model.predict(img, conf=self.conf_thres, verbose=False)[0]
         except Exception as e:
@@ -413,8 +416,6 @@ class YOLObjectDetect(Node):
             # ---- Estimate cylinder height & weight from depth (before TF) ----
             height_result = self.estimate_height_m(x1, y1, x2, y2)
             weight_label = None
-            top_px = None
-            table_px = None
 
             if height_result is not None:
                 height_m, top_px, table_px = height_result
@@ -488,13 +489,14 @@ class YOLObjectDetect(Node):
                 pt_msg.point.z = float(z_b)
                 self.coord_pub.publish(pt_msg)
 
-                # 2) Info string: class, conf, estimated weight
+                # 2) Combined info: x, y, z (mm in UR base) + weight (grams)
                 info = String()
-                # Example format: "red_object,0.87,200 g"
+
                 if weight_label is not None:
-                    info.data = f"{cls_name},{conf:.2f},{weight_label}"
+                    info.data = f"{x_mm:.1f},{y_mm:.1f},{z_mm:.1f},{weight_label}"
                 else:
-                    info.data = f"{cls_name},{conf:.2f},unknown"
+                    info.data = f"{x_mm:.1f},{y_mm:.1f},{z_mm:.1f},-1"
+
                 self.info_pub.publish(info)
 
                 # Publish TF in base frame
@@ -542,7 +544,7 @@ class YOLObjectDetect(Node):
             cv2.imshow("YOLO Detection", img)
 
             # Optional separate view just for the sampling pixels
-            height_debug = np.zeros_like(img)
+            height_debug = img.copy()   # instead of np.zeros_like(img)
             for (px, label, color) in [
                 (top_px, "TOP", (0, 0, 255)),
                 (table_px, "TABLE", (255, 0, 255)),
