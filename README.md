@@ -10,7 +10,7 @@ A comprehensive ROS2 (Humble) system for robotic sorting using a UR5e arm with c
    - [Computer Vision](#computer-vision)
    - [Custom End-Effector](#custom-end-effector)
    - [Weight Detection](#weight-detection)
-   - [System Visualization](#system-visualization)
+   - [System Visualisation](#system-visualisation)
    - [Closed-Loop Operation](#closed-loop-operation)
 4. [Installation and Setup](#installation-and-setup)
 5. [Running the System](#running-the-system)
@@ -26,21 +26,21 @@ A comprehensive ROS2 (Humble) system for robotic sorting using a UR5e arm with c
 
 ### Problem Statement
 
-This system addresses the challenge of automated sorting of objects by weight in industrial and warehouse environments. The intended end-users are logistics operations, quality control facilities, and manufacturing plants requiring precise weight-based categorization of products.
+This system addresses the challenge of automated sorting of objects by weight in industrial and warehouse environments. The intended end-users are logistics operations, quality control facilities, and manufacturing plants requiring precise weight-based categorisation of products.
 
 ### Robot Functionality
 
 The UR5e robot performs closed-loop pick-and-place operations, using:
-- **Vision system** to detect and localize objects on a workspace
+- **Vision system** to detect and localise objects on a workspace
 - **Weight-sensing gripper** to measure object mass after pickup
-- **Dynamic decision making** to sort objects into weight-categorized bins
+- **Dynamic decision making** to sort objects into weight-categorised bins
 - **Real-time feedback** for adaptive path planning and collision avoidance
 
-The robot continuously monitors its environment, detects objects, picks them, weighs them, and places them in the appropriate bin based on weight thresholds (e.g., 0g, 50g, 100g, 200g, 500g).
+The robot continuously monitors its environment, detects objects, picks them, weighs them, and places them in the appropriate bin based on weight thresholds (e.g. 0g, 50g, 100g, 200g, 500g).
 
 ### Demonstration Video
 
-[**Watch the full sorting cycle demonstration**](https://www.youtube.com/placeholder) *(10-30 second video showing the robot detecting objects, picking, weighing, and sorting into bins with RViz visualization)*
+[**Watch the full sorting cycle demonstration**](https://www.youtube.com/placeholder) *(10-30 second video showing the robot detecting objects, picking, weighing, and sorting into bins with RViz visualisation)*
 
 ---
 
@@ -152,10 +152,10 @@ The system consists of 9 core nodes communicating through topics, services, and 
 - Provides planning services for pick-and-place operations
 
 #### 3. **Go Home** (`motion_control_module`)
-- Initialization script that moves robot to safe home position
+- Initialisation script that moves robot to safe home position
 - Executes once during system startup
 
-#### 4. **Safety Boundary Visualizer** (`motion_control_module`)
+#### 4. **Safety Boundary Visualiser** (`motion_control_module`)
 - Publishes RViz markers showing workspace boundaries
 - Monitors for collisions with safety zones
 - Provides visual feedback for safe operation zones
@@ -221,13 +221,13 @@ The vision pipeline consists of two modes:
 #### Simulated Perception (Testing)
 - Generates 4 random objects with positions and weights
 - Publishes at 5Hz on `/detected_objects` topic
-- Randomizes positions within defined workspace bounds
+- Randomises positions within defined workspace bounds
 - Used for simulation and hybrid modes
 
 #### Real Perception (Production)
 **Kevin's implementation:**
 - RGBD camera-based object detection
-- Point cloud processing for 3D localization
+- Point cloud processing for 3D localisation
 - Object segmentation and pose estimation
 - Real-time object tracking
 - Publishes detected objects with positions to standard topics
@@ -248,13 +248,13 @@ The perception system provides object poses in the robot's coordinate frame, ena
 - **URDF/XACRO model** (`ur5e_with_end_effector.urdf.xacro`)
 - **CAD files** in `stl/` directory
 - **Weight**: ~200g
-- **Gripper range**: 0-70mm opening
+- **Gripper range**: 0–70mm opening
 - **Max payload**: 500g
 
 #### Control Overview
 - Arduino communicates via serial at 115200 baud
-- Command format: `G<angle>` (e.g., `G90` for 90 degrees)
-- Response format: `W<weight>` (e.g., `W150.5` for 150.5 grams)
+- Command format: `G<angle>` (e.g. `G90` for 90 degrees)
+- Response format: `W<weight>` (e.g. `W150.5` for 150.5 grams)
 - Gripper controller node handles lifecycle management (configure → activate)
 
 #### Integration
@@ -301,7 +301,7 @@ Requires Universal Robots' `ur_robot_driver`.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `useSnapping` | `false` | When `true`, snaps output to discrete weights (0, 100, 200, 500g) for improved accuracy within the test weight set. When `false`, outputs continuous values rounded to the nearest gram, offering more continuous results but requiring longer to settle. |
+| `useSnapping` | `false` | When `true`, snaps output to discrete weights (0, 100, 200, 500g) for improved accuracy within the test weight set. When `false`, outputs continuous values rounded to the nearest gram, offering more continuous results but requiring longer to stabilise. |
 
 #### How It Works
 
@@ -318,14 +318,14 @@ Current Joint Torques → Kalman Filter → Torque Deltas → Kinematics → Mas
 5. **Output Calibration**:
    The system now uses a polynomial gain factor of $ax^2 + bx + c$ to calibrate estimates.
    - **Snapping ON** (`useSnapping: true`): Estimates are generously snapped to discrete weight classes {0, 100, 200, 500}g, optimised for accuracy within the defined test weight set.
-   - **Snapping OFF** (`useSnapping: false`): Provides continuous mass estimates, rounded to the nearest gram. This offers smoother results but may require more time to settle.
+   - **Snapping OFF** (`useSnapping: false`): Provides continuous mass estimates, rounded to the nearest gram. This offers smoother results but may require more time to stabilise.
 
 #### Usage
 
 1. **Initiate Calibration**: Go to a fixed height above the target pickup point and invoke the `/weight_detection/calibrate_baseline` service.
 2. **Calibration Wait Time**: The node requires ~5.5 seconds of baseline calibration on startup before producing estimates. Wait for `/weight_detection/calibration_status` to publish `false` before measurements are valid.
 3. **Perform Pickup Manoeuvre**: Descend, pickup the weight, and raise back to baseline-calibrated joint pose.
-4. **Read Estimation**: Wait ~10 seconds for noise to settle, and read `/estimated_mass` topic.
+4. **Read Estimation**: Wait ~10 seconds for noise to stabilise, and read `/estimated_mass` topic.
 5. **Repeat**: Steps 1-4 for each weight estimation procedure.
 
 **Compilation:**
@@ -353,7 +353,7 @@ If needed, test scripts are available in the format `test_{ROS_NODE_LANGUAGE}_{M
 
 The test processes data from pre-recorded ROS bags found in the [rosbags2 directory](rosbags2/).
 
-**Visualization:**
+**Visualisation:**
 
 Use **PlotJuggler** to monitor the estimated mass topic in real-time:
 
@@ -384,23 +384,23 @@ ros2 run weight_detection_module weight_detector_py.py
 - **Fixed baseline pose**: Gripper must return to the exact joint pose where calibration occurred for accurate estimates.
 - **Known weight set**: Snapping mode assumes payloads are one of {0, 100, 200, 500} grams. For arbitrary weights, disable snapping for more accurate continuous estimates.
 
-### System Visualization
+### System Visualisation
 
 #### RViz Configuration
-The system provides comprehensive RViz visualization showing:
+The system provides comprehensive RViz visualisation showing:
 - **Robot model** with real-time joint states
 - **End-effector pose** and gripper state
-- **Safety boundaries** (colored zones: green=safe, red=restricted)
+- **Safety boundaries** (coloured zones: green=safe, red=restricted)
 - **Detected objects** as 3D markers
 - **Planned trajectories** before execution
-- **Target bins** with labeled positions
+- **Target bins** with labelled positions
 
-#### Custom Visualization Scripts
+#### Custom Visualisation Scripts
 - `safety_boundary_collision.py` - Publishes workspace boundary markers
 - Custom RViz config files in `motion_control_module/config/`
 
 #### Real-Time Feedback
-- Joint states update at 500Hz (decimated to 50Hz for visualization)
+- Joint states update at 500Hz (decimated to 50Hz for visualisation)
 - Object detections at 5Hz
 - Weight estimates published continuously during weighing phase
 - System status displayed in terminal and RViz
@@ -431,7 +431,7 @@ The system operates in a continuous closed-loop cycle:
    │
    ├─► [4] WEIGH: Measure mass
    │       ├─ Move to weighing pose (fixed joint configuration)
-   │       ├─ Wait for weight detector to stabilize
+   │       ├─ Wait for weight detector to stabilise
    │       ├─ Read /estimated_mass
    │       └─ Brain stores weight measurement
    │
@@ -471,7 +471,7 @@ The system operates in a continuous closed-loop cycle:
    - Collision avoidance
    - Emergency stop capabilities
 
-#### Adaptive Behavior
+#### Adaptive Behaviour
 - If object not detected after approach, retry or skip
 - If weight measurement fails, recalibrate and retry
 - If trajectory planning fails, adjust approach pose
@@ -633,14 +633,6 @@ Key configuration parameters are in:
 - `supervisor_module/config/` - Sorting bins, workspace bounds
 - `motion_control_module/config/` - Motion planning parameters
 
-### Environment Variables
-
-Set FastDDS profile for reliable communication (automatically handled by launch scripts):
-```bash
-export FASTRTPS_DEFAULT_PROFILES_FILE=/tmp/fastdds_profile.xml
-export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-```
-
 ---
 
 ## Running the System
@@ -663,8 +655,8 @@ source install/setup.bash
 ros2 launch full_system.launch.py mode:=simulation
 ```
 
-**Expected behavior:**
-- Fake UR5e robot initializes in RViz
+**Expected behaviour:**
+- Fake UR5e robot initialises in RViz
 - 4 random objects appear in workspace
 - Robot moves to home position
 - System ready message appears after ~46 seconds
@@ -710,8 +702,8 @@ ros2 launch full_system.launch.py mode:=hybrid robot_ip:=192.168.0.100 real_weig
 ros2 topic echo /joint_states  # Should show ~500Hz updates
 ```
 
-**Expected behavior:**
-- Real UR5e connects and initializes
+**Expected behaviour:**
+- Real UR5e connects and initialises
 - Simulated objects published
 - Real gripper controlled via Arduino
 - Optional real weight detection from joint torques
@@ -746,7 +738,7 @@ ros2 launch full_system.launch.py mode:=real robot_ip:=192.168.0.100
 **Step 2: Wait for System Ready (~10 seconds)**
 - Monitor terminal for UR5e driver startup
 - Wait for MoveIt2 to fully load
-- Wait for weight detector initialization
+- Wait for weight detector initialisation
 - Look for "[2/9] Starting MoveIt..." and confirmation it's loaded
 
 **Step 3: Connect Robot to ROS2**
@@ -768,11 +760,11 @@ ros2 topic echo /estimated_mass
 ```
 
 **Step 5: System Ready**
-- All systems initialized after ~46 seconds
+- All systems initialised after ~46 seconds
 - Robot will execute go_home automatically
 - Use dashboard or topic commands to start sorting
 
-**Expected behavior:**
+**Expected behaviour:**
 - Real UR5e connects and moves to home position
 - Real perception nodes (external) provide object detections
 - Real weight detection via joint torques
@@ -813,7 +805,7 @@ The unified launch file (`full_system.launch.py`) accepts these arguments:
 |----------|---------|-------------|
 | `mode` | `simulation` | System mode: `simulation`, `hybrid`, or `real` |
 | `robot_ip` | `192.168.0.100` | IP address of real robot |
-| `launch_rviz` | `true` | Launch RViz visualization |
+| `launch_rviz` | `true` | Launch RViz visualisation |
 | `autorun` | `false` | Auto-start sorting without dashboard |
 | `real_weight_detection` | `false` | Use real weight detector in hybrid mode |
 
@@ -835,7 +827,7 @@ The launch file orchestrates a timed startup sequence:
 2. **[1s]** UR5e driver starts (simulation or real)
 3. **[10s]** MoveIt2 motion planning loads
 4. **[22s]** Robot moves to HOME position
-5. **[27s]** Safety boundary visualizer starts
+5. **[27s]** Safety boundary visualiser starts
 6. **[29s]** Perception starts (simulated or real)
 7. **[31s]** Weight detection starts (if enabled)
 8. **[33s]** Gripper controller starts
@@ -915,10 +907,10 @@ rqt_graph
 ### Design Goals
 
 The system was designed to achieve:
-1. **Reliable object detection** and localization
+1. **Reliable object detection** and localisation
 2. **Accurate weight measurement** (±5g precision)
 3. **Collision-free motion** planning
-4. **Closed-loop adaptive** behavior
+4. **Closed-loop adaptive** behaviour
 5. **Safe operation** within defined workspace boundaries
 
 ### Performance Metrics
@@ -938,7 +930,7 @@ The system was designed to achieve:
 - Discrete snapping mode: 0g, 100g, 200g, 500g classification
 - Continuous mode: Polynomial calibration, ±5g accuracy
 - Calibration time: ~5.5 seconds
-- Measurement stabilization: ~10 seconds after pickup
+- Measurement stabilisation: ~10 seconds after pickup
 
 **Motion Planning:**
 - Average planning time: 1.2 seconds
@@ -963,14 +955,14 @@ The system was designed to achieve:
 2. **Unified Launch System**
    - Single launch file supports all three modes
    - Seamless transition from simulation to real hardware
-   - Parameterized configuration for flexibility
+   - Parameterised configuration for flexibility
 
 3. **Modular Architecture**
    - Each module independently testable
    - Clear interfaces via custom messages
    - Easy to extend with additional functionality
 
-4. **Comprehensive Visualization**
+4. **Comprehensive Visualisation**
    - Real-time safety boundary feedback
    - Planned vs. executed trajectory comparison
    - System state and decision-making transparency
@@ -980,7 +972,7 @@ The system was designed to achieve:
 *(Include photos/screenshots here of:)*
 - Robot in home position
 - Gripper detail showing sensor
-- RViz visualization during operation
+- RViz visualisation during operation
 - Objects being sorted into bins
 - Dashboard UI
 
@@ -997,7 +989,7 @@ The system was designed to achieve:
 - Implemented Kalman filtering for torque smoothing
 - Developed calibration curves (exponential and polynomial)
 - Required fixed pose for repeatable measurements
-- Added 10-second stabilization period
+- Added 10-second stabilisation period
 
 **Outcome:** Achieved ±5g accuracy with proper calibration.
 
@@ -1005,7 +997,7 @@ The system was designed to achieve:
 **Challenge:** MoveIt2 occasionally failed to find valid paths, especially near workspace boundaries.
 
 **Solution:**
-- Implemented safety boundary visualization
+- Implemented safety boundary visualisation
 - Added retry logic with pose perturbations
 - Tuned planning parameters (timeout, attempts)
 - Created intermediate waypoints for complex motions
@@ -1047,7 +1039,7 @@ The system was designed to achieve:
 - **Real-time calibration** without stopping operation
 
 #### 3. Intelligent Planning
-- **Multi-object optimization**: Sort objects in optimal order to minimize cycle time
+- **Multi-object optimisation**: Sort objects in optimal order to minimise cycle time
 - **Adaptive bin placement**: Dynamically adjust bin positions based on weight distribution
 - **Predictive maintenance**: Monitor joint torques for wear detection
 
@@ -1061,10 +1053,10 @@ The system was designed to achieve:
 - **Real-time analytics**: Sorting statistics, throughput, error rates
 - **Calibration wizard**: Guided setup for new deployments
 
-#### 6. Performance Optimization
-- **Trajectory optimization**: Faster paths with jerk minimization
+#### 6. Performance Optimisation
+- **Trajectory optimisation**: Faster paths with jerk minimisation
 - **Parallel operations**: Pre-plan next move while executing current
-- **Reduced stabilization time**: Better filtering for faster weight readings
+- **Reduced stabilisation time**: Better filtering for faster weight readings
 
 ### Novel Contributions
 
@@ -1078,7 +1070,7 @@ The system was designed to achieve:
    - Enables rapid prototyping and testing
    - Reduces development risk
 
-3. **Comprehensive Safety Visualization**
+3. **Comprehensive Safety Visualisation**
    - Real-time boundary feedback improves operator confidence
    - Visual debugging reduces development time
    - Transparent decision-making aids in system validation
@@ -1091,9 +1083,9 @@ The system was designed to achieve:
 
 | Name | Role | Primary Responsibilities |
 |------|------|--------------------------|
-| **Joshua Cruddas** | System Integration Lead | Path planning, system visualization, UI dashboard, sorting brain logic, ROS2 node integration, launch file orchestration, testing and debugging |
-| **Asad** | Hardware & Mechatronics | Custom gripper design and assembly, URDF/XACRO modeling, Arduino gripper control, weight detection module (joint torque-based estimation), servo calibration |
-| **Kevin** | Perception & Vision | RGBD camera integration, object detection and segmentation, point cloud processing, 3D object localization, perception pipeline development |
+| **Joshua Cruddas** | System Integration Lead | Path planning, system visualisation, UI dashboard, sorting brain logic, ROS2 node integration, launch file orchestration, testing and debugging |
+| **Asad** | Hardware & Mechatronics | Custom gripper design and assembly, URDF/XACRO modelling, Arduino gripper control, weight detection module (joint torque-based estimation), servo calibration |
+| **Kevin** | Perception & Vision | RGBD camera integration, object detection and segmentation, point cloud processing, 3D object localisation, perception pipeline development |
 
 ### Detailed Contributions
 
@@ -1101,7 +1093,7 @@ The system was designed to achieve:
 - Designed and implemented `sorting_brain_node` state machine
 - Developed `cartesian_controller_node` for motion control
 - Created unified `full_system.launch.py` and shell scripts
-- Implemented safety boundary visualization
+- Implemented safety boundary visualisation
 - Developed dashboard UI for system control
 - Integrated all modules and resolved inter-node communication issues
 - Wrote system documentation and README
@@ -1118,7 +1110,7 @@ The system was designed to achieve:
 - Implemented real-time object detection from RGBD camera
 - Developed point cloud segmentation pipeline
 - Created 3D object pose estimation algorithms
-- Optimized perception for real-time performance
+- Optimised perception for real-time performance
 - Integrated perception with ROS2 messaging framework
 
 ---
