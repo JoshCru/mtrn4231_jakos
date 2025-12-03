@@ -64,12 +64,12 @@ class YOLObjectDetect(Node):
         # ---------- Marker -> UR base coordinates (mm) ----------
         # TODO: replace placeholders with real UR pendant measurements
         self.marker_to_ur_mm = {
-            1: np.array([200.0, -300.0, 100.0]),  # pick zone 1
-            2: np.array([200.0, -200.0, 100.0]),  # pick zone 2
-            3: np.array([200.0, -100.0, 100.0]),  # pick zone 3
-            4: np.array([200.0,    0.0, 100.0]),  # pick zone 4
-            5: np.array([400.0, -200.0, 100.0]),  # sorting bin A
-            6: np.array([400.0,    0.0, 100.0]),  # sorting bin B
+            1: np.array([-795.0, -252, 43.0]),  # pick zone 1
+            2: np.array([-415.0, -252, 43.0]),  # pick zone 2
+            3: np.array([-795.0, 56.0, 43.0]),  # pick zone 3
+            4: np.array([-415.0, 56.0, 43.0]),  # pick zone 4
+            5: np.array([-795.0, -391.0, 43.0]),  # sorting bin A
+            6: np.array([-415.0, -252.0, 43.0]),  # sorting bin B
         }
 
         # ---------- Depth camera subscriptions ----------
