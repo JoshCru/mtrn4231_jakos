@@ -164,15 +164,16 @@ fi
 # 6. Weight Detection
 echo "[6/7] Starting Weight Detection..."
 wait_for_enter
-ros2 run weight_detection_module weight_detector &
+# ros2 run weight_detection_module weight_detector &
+ros2 run weight_detection_module weight_detector_py --ros-args -p useSnapping:=false &
 WEIGHT_PID=$!
 sleep 2
 
-# Launch PlotJuggler for weight visualization (after weight detector starts)
-echo "Starting PlotJuggler for weight visualization..."
-"${ROS2_WS}/plot_weight.sh" &
-PLOT_PID=$!
-sleep 2
+# # Launch PlotJuggler for weight visualization (after weight detector starts)
+# echo "Starting PlotJuggler for weight visualization..."
+# "${ROS2_WS}/plot_weight.sh" &
+# PLOT_PID=$!
+# sleep 2
 
 # 7. Gripper Controller
 echo "[7/7] Starting Gripper Controller..."

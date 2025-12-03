@@ -28,13 +28,13 @@ class SimulatedPerceptionNode(Node):
     # These are the coordinates sent to the cartesian controller
     # Controller negates x/y, so robot moves to positive x/y in RViz
     PICKING_AREA = {
-        'x_min': -787.0, 'x_max': -420.0,
-        'y_min': -252.0, 'y_max': 50.0
+        'x_min': -795.0, 'x_max': -415.0,
+        'y_min': -252.0, 'y_max': 56.0
     }
 
     # Placing area bounds (adjacent to picking area)
     PLACING_AREA = {
-        'x_min': -787.0, 'x_max': -420.0,
+        'x_min': -795.0, 'x_max': -415.0,
         'y_min': -391.0, 'y_max': -252.0
     }
 
