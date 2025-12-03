@@ -22,6 +22,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/SortDecision.msg"
   "msg/EnvironmentStatus.msg"
   "msg/ForceFeedback.msg"
+  "msg/SystemStatus.msg"
   # Services
   "srv/SystemCommand.srv"
   "srv/ValidateWorkspace.srv"

@@ -48,7 +48,7 @@ source "${ROS2_WS}/install/setup.bash"
 # 1. UR Driver
 echo "[1/3] Starting UR5e Driver..."
 wait_for_enter
-ros2 launch ur_robot_driver ur_control.launch.py ur_type:=ur5e robot_ip:=$ROBOT_IP use_fake_hardware:=false launch_rviz:=false description_file:=ur5e_with_end_effector.urdf.xacro description_package:=motion_control_module &
+ros2 launch ur_robot_driver ur_control.launch.py ur_type:=ur5e robot_ip:=$ROBOT_IP use_fake_hardware:=false launch_rviz:=false description_file:=ur5e_with_end_effector.urdf.xacro description_package:=motion_control_package &
 UR_PID=$!
 sleep 10
 
@@ -59,7 +59,7 @@ ros2 control list_controllers
 # 2. MoveIt
 echo "[2/3] Starting MoveIt..."
 wait_for_enter
-ros2 launch motion_control_module ur5e_moveit_with_gripper.launch.py robot_ip:=$ROBOT_IP ur_type:=ur5e launch_rviz:=true &
+ros2 launch motion_control_package ur5e_moveit_with_gripper.launch.py robot_ip:=$ROBOT_IP ur_type:=ur5e launch_rviz:=true &
 MOVEIT_PID=$!
 
 echo "Waiting for MoveIt to initialize..."
@@ -72,7 +72,7 @@ sleep 2
 # 3. Cartesian Controller
 echo "[3/3] Starting Cartesian Controller..."
 wait_for_enter
-ros2 run motion_control_module cartesian_controller_node --ros-args -p use_fake_hardware:=false &
+ros2 run motion_control_package cartesian_controller_node --ros-args -p use_fake_hardware:=false &
 CARTESIAN_PID=$!
 sleep 3
 
@@ -84,7 +84,7 @@ echo ""
 echo "Test commands you can run in another terminal:"
 echo ""
 echo "  # Go to home position"
-echo "  ros2 run motion_control_module go_home 5.0"
+echo "  ros2 run motion_control_package go_home 5.0"
 echo ""
 echo "  # Move to a position (x, y, z in mm)"
 echo "  ros2 topic pub --once /cartesian/target geometry_msgs/msg/Point \"{x: 400.0, y: 0.0, z: 300.0}\""

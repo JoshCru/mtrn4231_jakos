@@ -19,6 +19,8 @@
 #   --sim-weight          Use simulated weight detection (default)
 #   --real-weight         Use real weight detection
 #   --no-weight           Skip weight detection entirely
+#   --weight-detector-cpp Use C++ weight detector implementation (default)
+#   --weight-detector-python  Use Python weight detector implementation
 #   --go-home             Run go_home action before other nodes
 #   --position-check      Run position check (for simulated perception)
 #   --autorun             Auto-start application after launch
@@ -38,6 +40,7 @@ ROS2_WS="${SCRIPT_DIR}/../../ros2_system"
 APP_MODE="sorting"  # Options: "sorting", "simple"
 SIM_PERCEPTION=false
 WEIGHT_MODE="sim"  # Options: "sim", "real", "none"
+WEIGHT_DETECTOR_IMPL="cpp"  # Options: "cpp", "python"
 RUN_GO_HOME=false
 RUN_POSITION_CHECK=false
 AUTORUN=false
@@ -45,7 +48,7 @@ GRIP_WEIGHT=100
 
 # Parse arguments
 show_help() {
-    head -n 31 "$0" | tail -n 27
+    head -n 33 "$0" | tail -n 29
     exit 0
 }
 
@@ -73,6 +76,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-weight)
             WEIGHT_MODE="none"
+            shift
+            ;;
+        --weight-detector-cpp)
+            WEIGHT_DETECTOR_IMPL="cpp"
+            shift
+            ;;
+        --weight-detector-python)
+            WEIGHT_DETECTOR_IMPL="python"
             shift
             ;;
         --go-home)
@@ -129,7 +140,7 @@ STEP=1
 # 1. Go Home (optional)
 if [ "$RUN_GO_HOME" = true ]; then
     echo "[$STEP] Moving robot to HOME position..."
-    ros2 run motion_control_module go_home 5.0
+    ros2 run motion_control_package go_home 5.0
     echo "  Robot at home position"
     sleep 2
     echo ""
@@ -140,7 +151,7 @@ fi
 PERCEPTION_PID=""
 if [ "$SIM_PERCEPTION" = true ]; then
     echo "[$STEP] Starting Simulated Perception..."
-    ros2 run supervisor_module simulated_perception_node \
+    ros2 run perception_package simulated_perception_node \
         --ros-args \
         -p num_objects:=4 \
         -p publish_rate:=5.0 \
@@ -158,8 +169,12 @@ PLOT_PID=""
 
 case $WEIGHT_MODE in
     real)
-        echo "[$STEP] Starting Real Weight Detection..."
-        ros2 run weight_detection_module weight_detector &
+        echo "[$STEP] Starting Real Weight Detection ($WEIGHT_DETECTOR_IMPL)..."
+        if [ "$WEIGHT_DETECTOR_IMPL" = "python" ]; then
+            ros2 run weight_detection_package weight_detector_py &
+        else
+            ros2 run weight_detection_package weight_detector &
+        fi
         WEIGHT_PID=$!
         PIDS+=($WEIGHT_PID)
         sleep 2
@@ -190,7 +205,7 @@ if [ "$RUN_POSITION_CHECK" = true ]; then
         echo "[$STEP] Running Position Check for Simulated Perception..."
         echo "  The robot will visit each simulated weight position at Z_PICKUP."
         echo ""
-        python3 "${ROS2_WS}/src/motion_control_module/scripts/check_simulated_positions.py"
+        python3 "${ROS2_WS}/src/motion_control_package/scripts/check_simulated_positions.py"
 
         if [ $? -eq 0 ]; then
             echo ""
@@ -222,7 +237,7 @@ APP_PID=""
 
 if [ "$APP_MODE" = "sorting" ]; then
     echo "[$STEP] Starting Sorting Brain..."
-    ros2 run supervisor_module sorting_brain_node &
+    ros2 run supervisor_package sorting_brain_node &
     APP_PID=$!
     PIDS+=($APP_PID)
     sleep 2
@@ -243,7 +258,7 @@ elif [ "$APP_MODE" = "simple" ]; then
     echo ""
 
     # Run simple pick and weigh (blocking call)
-    ros2 run motion_control_module simple_pick_and_weigh_node \
+    ros2 run motion_control_package simple_pick_and_weigh_node \
         --ros-args \
         -p grip_weight:=${GRIP_WEIGHT} \
         -p initial_positioning:=true

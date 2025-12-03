@@ -1,8 +1,0 @@
-system_controller_node:
-  ros__parameters:
-    num_target_areas: 3
-    auto_start: false
-    publish_rate: 1.0
-
-    # Note: Target area definitions are initialized in code
-    # See system_controller_node.cpp::initialize_target_areas() for configuration

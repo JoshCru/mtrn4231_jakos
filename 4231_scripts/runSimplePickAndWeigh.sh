@@ -90,7 +90,7 @@ if [ "$USE_FAKE_HARDWARE" = true ]; then
         use_fake_hardware:=$USE_FAKE_HARDWARE \
         launch_rviz:=false \
         description_file:=ur5e_with_end_effector.urdf.xacro \
-        description_package:=motion_control_module &
+        description_package:=motion_control_package &
 else
     # Real hardware mode - use default controller
     ros2 launch ur_robot_driver ur_control.launch.py \
@@ -99,7 +99,7 @@ else
         use_fake_hardware:=$USE_FAKE_HARDWARE \
         launch_rviz:=false \
         description_file:=ur5e_with_end_effector.urdf.xacro \
-        description_package:=motion_control_module &
+        description_package:=motion_control_package &
 fi
 UR_PID=$!
 
@@ -112,7 +112,7 @@ ros2 control list_controllers
 # 2. MoveIt
 echo "[2/7] Starting MoveIt with RViz..."
 wait_for_enter
-ros2 launch motion_control_module ur5e_moveit_with_gripper.launch.py \
+ros2 launch motion_control_package ur5e_moveit_with_gripper.launch.py \
     robot_ip:=$ROBOT_IP \
     ur_type:=ur5e \
     launch_rviz:=true &
@@ -140,7 +140,7 @@ fi
 # 3. Go Home
 echo "[3/7] Moving robot to HOME position..."
 wait_for_enter
-ros2 run motion_control_module go_home 5.0
+ros2 run motion_control_package go_home 5.0
 echo "Robot at home position"
 sleep 2
 
@@ -150,7 +150,7 @@ PERCEPTION_PID=""
 if [ "$SIM_PERCEPTION" = true ]; then
     echo "[5/7] Starting Simulated Perception..."
     wait_for_enter
-    ros2 run supervisor_module simulated_perception_node \
+    ros2 run perception_package simulated_perception_node \
         --ros-args \
         -p num_objects:=4 \
         -p publish_rate:=5.0 \
@@ -164,7 +164,7 @@ fi
 # 6. Weight Detection
 echo "[6/7] Starting Weight Detection..."
 wait_for_enter
-ros2 run weight_detection_module weight_detector &
+ros2 run weight_detection_package weight_detector &
 WEIGHT_PID=$!
 sleep 2
 
@@ -177,7 +177,7 @@ sleep 2
 # 7. Gripper Controller
 echo "[7/7] Starting Gripper Controller..."
 wait_for_enter
-ros2 run control_module gripper_controller_node \
+ros2 run control_package gripper_controller_node \
     --ros-args \
     -p simulation_mode:=$USE_FAKE_HARDWARE &
 GRIPPER_PID=$!
@@ -192,7 +192,7 @@ sleep 3
 # 8. Cartesian Controller
 echo "[8/8] Starting Cartesian Controller..."
 wait_for_enter
-ros2 run motion_control_module cartesian_controller_node \
+ros2 run motion_control_package cartesian_controller_node \
     --ros-args \
     -p use_fake_hardware:=false &
 CARTESIAN_PID=$!
@@ -207,7 +207,7 @@ echo "Now running simple pick and weigh (C++ version)..."
 echo ""
 
 # Run the C++ simple pick and weigh node with initial positioning enabled
-ros2 run motion_control_module simple_pick_and_weigh_node \
+ros2 run motion_control_package simple_pick_and_weigh_node \
     --ros-args \
     -p grip_weight:=${GRIP_WEIGHT} \
     -p initial_positioning:=true

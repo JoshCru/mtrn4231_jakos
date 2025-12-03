@@ -16,7 +16,7 @@ source /opt/ros/humble/setup.bash
 source "${ROS2_WS}/install/setup.bash"
 
 echo "Step 1: Starting gripper controller in simulation mode..."
-ros2 run control_module gripper_controller_node --ros-args -p simulation_mode:=true &
+ros2 run control_package gripper_controller_node --ros-args -p simulation_mode:=true &
 GRIPPER_PID=$!
 echo "   PID: $GRIPPER_PID"
 

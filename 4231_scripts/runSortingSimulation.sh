@@ -58,7 +58,7 @@ ros2 launch ur_robot_driver ur_control.launch.py \
     use_fake_hardware:=true \
     launch_rviz:=false \
     description_file:=ur5e_with_end_effector.urdf.xacro \
-    description_package:=motion_control_module &
+    description_package:=motion_control_package &
 
 UR_PID=$!
 echo "   UR Driver PID: $UR_PID"
@@ -69,7 +69,7 @@ sleep 5
 
 echo ""
 echo "[2/8] Starting MoveIt..."
-ros2 launch motion_control_module ur5e_moveit_with_gripper.launch.py \
+ros2 launch motion_control_package ur5e_moveit_with_gripper.launch.py \
     ur_type:=ur5e \
     launch_rviz:=true \
     use_fake_hardware:=true &
@@ -84,11 +84,11 @@ sleep 10
 echo ""
 echo "[3/8] Starting Visualizations (BEFORE go_home)..."
 echo "   - Safety Boundary Visualizer"
-python3 "${ROS2_WS}/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_collision.py" &
+python3 "${ROS2_WS}/install/motion_control_package/share/motion_control_package/scripts/safety_boundary_collision.py" &
 SAFETY_PID=$!
 
 echo "   - Simulated Perception Node (weights & zones)"
-ros2 run supervisor_module simulated_perception_node \
+ros2 run perception_package simulated_perception_node \
     --ros-args -p num_objects:=4 -p publish_rate:=5.0 -p randomize_positions:=true &
 PERCEPTION_PID=$!
 
@@ -112,12 +112,12 @@ echo ""
 
 echo "[4/8] Moving robot to HOME position..."
 echo "   (Required for Cartesian path planning to work)"
-ros2 run motion_control_module go_home 5.0
+ros2 run motion_control_package go_home 5.0
 echo "   Robot at home position"
 
 echo ""
 echo "[5/8] Starting Cartesian Controller..."
-ros2 run motion_control_module cartesian_controller_node &
+ros2 run motion_control_package cartesian_controller_node &
 
 CARTESIAN_PID=$!
 echo "   Cartesian Controller PID: $CARTESIAN_PID"
@@ -126,7 +126,7 @@ sleep 3
 
 echo ""
 echo "[6/8] Starting Sorting Brain Node..."
-ros2 run supervisor_module sorting_brain_node &
+ros2 run supervisor_package sorting_brain_node &
 
 SORTING_PID=$!
 echo "   Sorting Brain PID: $SORTING_PID"

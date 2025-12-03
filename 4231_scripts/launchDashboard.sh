@@ -35,7 +35,7 @@ echo "  [!] E-Stop  - Emergency stop"
 echo ""
 
 # Launch the dashboard
-ros2 run supervisor_module system_dashboard
+ros2 run supervisor_package system_dashboard
 
 echo ""
 echo "Dashboard closed."

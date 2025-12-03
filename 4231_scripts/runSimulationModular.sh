@@ -57,7 +57,7 @@ ros2 launch ur_robot_driver ur_control.launch.py \
     use_fake_hardware:=true \
     launch_rviz:=false \
     description_file:=ur5e_with_end_effector.urdf.xacro \
-    description_package:=motion_control_module &
+    description_package:=motion_control_package &
 UR_PID=$!
 
 echo "Waiting for UR driver to initialize..."
@@ -69,7 +69,7 @@ ros2 control list_controllers
 # 2. MoveIt
 echo "[2/8] Starting MoveIt with RViz..."
 wait_for_enter
-ros2 launch motion_control_module ur5e_moveit_with_gripper.launch.py \
+ros2 launch motion_control_package ur5e_moveit_with_gripper.launch.py \
     ur_type:=ur5e \
     launch_rviz:=true \
     use_fake_hardware:=true &
@@ -85,21 +85,21 @@ sleep 2
 # 3. Go Home
 echo "[3/8] Moving robot to HOME position..."
 wait_for_enter
-ros2 run motion_control_module go_home 5.0
+ros2 run motion_control_package go_home 5.0
 echo "Robot at home position"
 sleep 2
 
 # 4. Safety Visualizer
 echo "[4/8] Starting Safety Visualizer..."
 wait_for_enter
-python3 "${ROS2_WS}/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_collision.py" &
+python3 "${ROS2_WS}/install/motion_control_package/share/motion_control_package/scripts/safety_boundary_collision.py" &
 SAFETY_PID=$!
 sleep 2
 
 # 5. Simulated Perception
 echo "[5/8] Starting Simulated Perception..."
 wait_for_enter
-ros2 run supervisor_module simulated_perception_node \
+ros2 run perception_package simulated_perception_node \
     --ros-args \
     -p num_objects:=4 \
     -p publish_rate:=5.0 \
@@ -113,7 +113,7 @@ echo "[6/8] Skipping Weight Detection (using simulated weights)"
 # 7. Gripper Controller (Simulation Mode)
 echo "[7/8] Starting Gripper Controller (SIMULATION)..."
 wait_for_enter
-ros2 run control_module gripper_controller_node \
+ros2 run control_package gripper_controller_node \
     --ros-args \
     -p simulation_mode:=true &
 GRIPPER_PID=$!
@@ -128,7 +128,7 @@ sleep 3
 # 8. Cartesian Controller
 echo "[8/8] Starting Cartesian Controller..."
 wait_for_enter
-ros2 run motion_control_module cartesian_controller_node \
+ros2 run motion_control_package cartesian_controller_node \
     --ros-args \
     -p use_fake_hardware:=true &
 CARTESIAN_PID=$!
@@ -143,7 +143,7 @@ echo ""
 echo "Running position check for simulated weights..."
 echo "The robot will visit each simulated weight position at Z_PICKUP."
 echo ""
-python3 "${ROS2_WS}/src/motion_control_module/scripts/check_simulated_positions.py"
+python3 "${ROS2_WS}/src/motion_control_package/scripts/check_simulated_positions.py"
 
 if [ $? -eq 0 ]; then
     echo ""
@@ -163,7 +163,7 @@ fi
 # 9. Sorting Brain
 echo "[9/9] Starting Sorting Brain..."
 wait_for_enter
-ros2 run supervisor_module sorting_brain_node &
+ros2 run supervisor_package sorting_brain_node &
 SORTING_PID=$!
 sleep 2
 
