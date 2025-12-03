@@ -36,11 +36,13 @@ The UR5e robot performs closed-loop pick-and-place operations, using:
 - **Dynamic decision making** to sort objects into weight-categorised bins
 - **Real-time feedback** for adaptive path planning and collision avoidance
 
-The robot continuously monitors its environment, detects objects, picks them, weighs them, and places them in the appropriate bin based on weight thresholds (e.g. 0g, 50g, 100g, 200g, 500g).
+The robot continuously monitors its environment, detects objects, picks them, weighs them, and places them in the appropriate region based on weight thresholds (e.g. 0g, 100g, 200g, 500g).
 
 ### Demonstration Video
 
-[**Watch the full sorting cycle demonstration**](https://www.youtube.com/placeholder) *(10-30 second video showing the robot detecting objects, picking, weighing, and sorting into bins with RViz visualisation)*
+[**Click on the image below for the closed loop demonstration video!**](https://youtu.be/PpM6lK07q4s)
+
+[![**Watch the full sorting cycle demonstration**](https://img.youtube.com/vi/PpM6lK07q4s/0.jpg)](https://www.youtube.com/watch?v=PpM6lK07q4s)
 
 ---
 
@@ -162,14 +164,13 @@ The system consists of 9 core nodes communicating through topics, services, and 
 
 #### 5. **Perception** (`supervisor_module` / `perception_module`)
 - **Simulated Mode**: Generates random object positions for testing
-- **Real Mode**: Kevin's perception nodes provide actual object detection from RGBD camera
+- **Real Mode**: Perception nodes provide actual object detection from RGBD camera
 - Publishes detected objects with positions and estimated weights
 
 #### 6. **Weight Detector** (`weight_detection_module`)
 - Estimates payload mass using UR5e joint torque measurements
 - Uses Kalman filtering and forward kinematics
 - Publishes weight estimates on `/estimated_mass` topic
-- See [Weight Detection Module README](ros2_system/src/weight_detection_module/README.md) for detailed documentation
 
 #### 7. **Gripper Controller** (`control_module`)
 - Lifecycle-managed node controlling the custom gripper
@@ -225,7 +226,7 @@ The vision pipeline consists of two modes:
 - Used for simulation and hybrid modes
 
 #### Real Perception (Production)
-**Kevin's implementation:**
+**Implementation:**
 - RGBD camera-based object detection
 - Point cloud processing for 3D localisation
 - Object segmentation and pose estimation
@@ -235,6 +236,8 @@ The vision pipeline consists of two modes:
 The perception system provides object poses in the robot's coordinate frame, enabling direct pick planning without additional transformation.
 
 ### Custom End-Effector
+
+![Gripper image](Gripper_Render.png "Rendered Image of Gripper Model")
 
 **Gripper design integrates:**
 
