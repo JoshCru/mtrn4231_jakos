@@ -27,7 +27,7 @@ from typing import List, Optional, Tuple
 import time
 
 # Messages
-from std_msgs.msg import String, Float32, Int32, Header
+from std_msgs.msg import String, Float32, Int32, Bool, Header
 from geometry_msgs.msg import Pose
 from visualization_msgs.msg import Marker, MarkerArray
 from sort_interfaces.msg import DetectedObjects, WeightEstimate, BoundingBox
@@ -137,10 +137,16 @@ class SortingBrainNode(Node):
         self.holding_object: bool = False
         self.held_weight_grams: float = 0.0
 
+        # Track position check completion (for synchronization with gripper)
+        self.position_check_ready: bool = False
+
         self._init_services()
         self._init_subscribers()
         self._init_publishers()
         self._init_timers()
+
+        # Wait for position check completion signal (with timeout)
+        self._wait_for_position_check_ready()
 
         self.get_logger().info('Sorting Brain Node initialized')
         self.get_logger().info(f'Picking area: X[{self.PICKING_AREA["x_min"]}, {self.PICKING_AREA["x_max"]}] '
@@ -218,6 +224,15 @@ class SortingBrainNode(Node):
             callback_group=self.callback_group
         )
 
+        # Position check completion signal
+        self.position_check_sub = self.create_subscription(
+            Bool,
+            '/position_check/done',
+            self.position_check_callback,
+            10,
+            callback_group=self.callback_group
+        )
+
     def _init_publishers(self):
         """Initialize topic publishers."""
         self.status_pub = self.create_publisher(String, '/sorting/status', 10)
@@ -234,6 +249,13 @@ class SortingBrainNode(Node):
         self.remove_object_pub = self.create_publisher(
             BoundingBox,
             '/perception/remove_object',
+            10
+        )
+
+        # Publisher to notify perception to add an object back (during rearranging)
+        self.add_object_pub = self.create_publisher(
+            BoundingBox,
+            '/perception/add_object',
             10
         )
 
@@ -283,8 +305,12 @@ class SortingBrainNode(Node):
 
         if command == "start":
             if self.state == SortingState.IDLE:
-                self.state = SortingState.WAITING_FOR_DETECTION
-                self.publish_status("System started - waiting for objects")
+                if not self.position_check_ready:
+                    self.publish_status("Waiting for position check to complete before starting...")
+                    self.get_logger().warn("Cannot start yet - position check not complete")
+                else:
+                    self.state = SortingState.WAITING_FOR_DETECTION
+                    self.publish_status("System started - waiting for objects")
             else:
                 self.publish_status(f"Cannot start - already in state: {self.state.value}")
 
@@ -348,6 +374,29 @@ class SortingBrainNode(Node):
             if self.weight_wait_start and time.time() - self.weight_wait_start > 3.0:
                 self.current_weight = msg.data
                 self.get_logger().info(f'Using gripper force as weight estimate: {msg.data:.1f}g')
+
+    def position_check_callback(self, msg: Bool):
+        """Handle position check completion signal."""
+        if msg.data and not self.position_check_ready:
+            self.position_check_ready = True
+            self.get_logger().info('Received position check completion signal - gripper is ready')
+
+    def _wait_for_position_check_ready(self):
+        """Wait for position check completion signal with timeout."""
+        self.get_logger().info('Waiting for position check completion signal...')
+
+        timeout = 5.0  # Wait up to 5 seconds
+        start_time = time.time()
+
+        while not self.position_check_ready and (time.time() - start_time) < timeout:
+            rclpy.spin_once(self, timeout_sec=0.1)
+
+        if self.position_check_ready:
+            self.get_logger().info('Position check confirmed complete - ready to start')
+        else:
+            # Timeout reached - assume position check already completed before we started
+            self.position_check_ready = True
+            self.get_logger().info('No position check signal received (likely already complete) - ready to start')
 
     # ==================== State Machine ====================
 
@@ -708,6 +757,12 @@ class SortingBrainNode(Node):
             self.staged_weight = self.current_weight
             self.staged_object_id = self.current_object_id
 
+            # Notify perception to add this object back to the list (so it appears in visualization)
+            if self.current_detected_object is not None:
+                add_msg = self.current_detected_object  # Use the original detected object
+                self.add_object_pub.publish(add_msg)
+                self.get_logger().info(f'Notified perception: re-added object {self.current_object_id} to picking area')
+
             # Lift slightly to clear the weight
             if not self.move_to(staging_x, staging_y, self.Z_DESCEND):
                 self.get_logger().error('Failed to retreat from staging')
@@ -763,6 +818,13 @@ class SortingBrainNode(Node):
             self.holding_object = True
             self.current_weight = self.staged_weight
             self.current_object_id = self.staged_object_id
+
+            # Notify perception to remove this object again (picked it back up)
+            if self.current_detected_object is not None:
+                remove_msg = BoundingBox()
+                remove_msg.id = self.current_object_id
+                self.remove_object_pub.publish(remove_msg)
+                self.get_logger().info(f'Notified perception: removed object {self.current_object_id} (picked back up)')
 
             # Lift to clear
             if not self.move_to(staging_x, staging_y, self.Z_DESCEND):

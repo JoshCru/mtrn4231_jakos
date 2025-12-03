@@ -10,8 +10,10 @@ import rclpy
 from rclpy.node import Node
 from sort_interfaces.msg import DetectedObjects, BoundingBox
 from sort_interfaces.srv import MoveToCartesian, GripperControl
+from std_msgs.msg import Bool
 import yaml
 import sys
+import time
 
 
 class PositionCheckNode(Node):
@@ -40,6 +42,9 @@ class PositionCheckNode(Node):
             self.objects_callback,
             10
         )
+
+        # Publisher to signal completion
+        self.done_publisher = self.create_publisher(Bool, '/position_check/done', 10)
 
     def load_config(self):
         """Load configuration from robot_config.yaml"""
@@ -153,6 +158,16 @@ class PositionCheckNode(Node):
         self.get_logger().info('Opening gripper...')
         self.open_gripper()
 
+        # Start at first object's position at Z_HOME
+        if len(self.detected_objects) > 0:
+            first_obj = self.detected_objects[0]
+            center_x = (first_obj.x_min + first_obj.x_max) / 2.0
+            center_y = (first_obj.y_min + first_obj.y_max) / 2.0
+            self.get_logger().info(f'Moving to first position at Z_HOME...')
+            if not self.move_to(center_x, center_y, self.z_home):
+                self.get_logger().error('Failed to move to first position at Z_HOME')
+                return False
+
         # Visit each position
         for i, obj in enumerate(self.detected_objects):
             # Calculate center position from bounding box
@@ -173,10 +188,18 @@ class PositionCheckNode(Node):
             self.get_logger().info(f'Perceived Weight: {weight}g')
             self.get_logger().info('')
 
-            # Move to position at Z_PICKUP
-            self.get_logger().info(f'Moving to position {i+1} at Z_PICKUP...')
+            # If not the first object, we're already at Z_HOME from previous step
+            # Move to XY coordinates at Z_HOME
+            if i > 0:
+                self.get_logger().info(f'Moving to position {i+1} XY coordinates at Z_HOME...')
+                if not self.move_to(center_x, center_y, self.z_home):
+                    self.get_logger().error(f'Failed to move to position {i+1} at Z_HOME')
+                    return False
+
+            # Drop down to Z_PICKUP
+            self.get_logger().info(f'Dropping down to Z_PICKUP...')
             if not self.move_to(center_x, center_y, self.z_pickup):
-                self.get_logger().error(f'Failed to move to position {i+1}')
+                self.get_logger().error(f'Failed to drop to Z_PICKUP at position {i+1}')
                 return False
 
             self.get_logger().info('')
@@ -189,6 +212,13 @@ class PositionCheckNode(Node):
                 input('Press Enter to continue to next position...')
             except:
                 pass
+
+            # Go back up to Z_HOME before moving to next position
+            if i < len(self.detected_objects) - 1:
+                self.get_logger().info(f'Going back up to Z_HOME...')
+                if not self.move_to(center_x, center_y, self.z_home):
+                    self.get_logger().error(f'Failed to go up to Z_HOME from position {i+1}')
+                    return False
 
         # Return to home
         self.get_logger().info('')
@@ -204,6 +234,19 @@ class PositionCheckNode(Node):
         # Close gripper
         self.get_logger().info('Closing gripper...')
         self.close_gripper()
+
+        # Wait for gripper to fully complete closing and settling
+        # The gripper service uses a timed wait (default 5s), but the Arduino
+        # may take longer to complete the movement and stabilize
+        gripper_settle_time = 12.0
+        self.get_logger().info(f'Waiting {gripper_settle_time}s for gripper to settle...')
+        time.sleep(gripper_settle_time)
+
+        # Signal completion so sorting system knows it's safe to start
+        done_msg = Bool()
+        done_msg.data = True
+        self.done_publisher.publish(done_msg)
+        self.get_logger().info('Published position check completion signal')
 
         self.get_logger().info('')
         self.get_logger().info('=' * 70)

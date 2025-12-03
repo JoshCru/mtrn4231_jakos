@@ -113,6 +113,14 @@ class SimulatedPerceptionNode(Node):
             10
         )
 
+        # Subscribe to add objects back (for rearranging)
+        self.add_sub = self.create_subscription(
+            BoundingBox,
+            '/perception/add_object',
+            self.add_object_callback,
+            10
+        )
+
         # Timer for publishing
         self.timer = self.create_timer(1.0 / publish_rate, self.publish_objects)
 
@@ -239,6 +247,17 @@ class SimulatedPerceptionNode(Node):
             self.get_logger().info(f'Published weight estimate: {weight:.0f}g for object {msg.id}')
         else:
             self.get_logger().warn(f'Object {msg.id} not found for removal')
+
+    def add_object_callback(self, msg: BoundingBox):
+        """Add an object back when it's returned during rearranging."""
+        # Check if object already exists
+        if any(o.id == msg.id for o in self.objects):
+            self.get_logger().warn(f'Object {msg.id} already exists, ignoring add request')
+            return
+
+        # Add the object back to the list
+        self.objects.append(msg)
+        self.get_logger().info(f'Re-added object {msg.id} back to detection list, {len(self.objects)} total')
 
     def publish_objects(self):
         """Publish the current list of detected objects."""
