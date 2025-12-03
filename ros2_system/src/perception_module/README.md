@@ -171,9 +171,10 @@ ros2 run perception_module object_detect_yolo \
 perception_module/
 ├── perception_module/
 │   ├── object_detect_yolo.py
-│   ├── object_detect_yolo2.py
+│   ├── object_detect_yolo2.py #with aruco markers
 ├── launch/
 │   ├── object_detect.launch.py
+│   ├── object_detect2.launch.py #with aruco markers
 ├── red_object.v3/        # YOLO dataset
 ├── runs/detect/trainXX/  # Trained YOLO weights
 ├── resource/
