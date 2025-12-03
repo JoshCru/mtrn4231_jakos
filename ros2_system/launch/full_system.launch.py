@@ -101,7 +101,7 @@ def generate_launch_description():
     ])
 
     # Find package shares
-    motion_control_share = FindPackageShare('motion_control_module')
+    motion_control_share = FindPackageShare('motion_control_package')
 
     # ==================== FastDDS Profile Setup ====================
     # Create FastDDS profile for reliable communication
@@ -152,7 +152,7 @@ echo "FastDDS profile created at /tmp/fastdds_profile.xml"
                     'use_fake_hardware': use_fake_hardware,
                     'launch_rviz': 'false',
                     'description_file': 'ur5e_with_end_effector.urdf.xacro',
-                    'description_package': 'motion_control_module',
+                    'description_package': 'motion_control_package',
                 }.items()
             )
         ]
@@ -166,7 +166,7 @@ echo "FastDDS profile created at /tmp/fastdds_profile.xml"
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource([
                     PathJoinSubstitution([
-                        FindPackageShare('motion_control_module'),
+                        FindPackageShare('motion_control_package'),
                         'launch',
                         'ur5e_moveit_with_gripper.launch.py'
                     ])
@@ -186,8 +186,14 @@ echo "FastDDS profile created at /tmp/fastdds_profile.xml"
         period=22.0,
         actions=[
             LogInfo(msg='[3/9] Moving robot to HOME position...'),
-            ExecuteProcess(
-                cmd=['ros2', 'run', 'motion_control_module', 'go_home', '5.0'],
+            Node(
+                package='motion_control_package',
+                executable='go_home.py',
+                name='go_home_node',
+                parameters=[{
+                    'controller_name': initial_joint_controller
+                }],
+                arguments=['5.0'],
                 output='screen'
             )
         ]
@@ -204,7 +210,7 @@ echo "FastDDS profile created at /tmp/fastdds_profile.xml"
                     PathJoinSubstitution([
                         motion_control_share,
                         'share',
-                        'motion_control_module',
+                        'motion_control_package',
                         'scripts',
                         'safety_boundary_collision.py'
                     ])
@@ -224,7 +230,7 @@ echo "FastDDS profile created at /tmp/fastdds_profile.xml"
                 condition=IfCondition(use_simulated_perception)
             ),
             Node(
-                package='supervisor_module',
+                package='supervisor_package',
                 executable='simulated_perception_node',
                 name='simulated_perception_node',
                 parameters=[{
@@ -264,7 +270,7 @@ echo "FastDDS profile created at /tmp/fastdds_profile.xml"
                 condition=IfCondition(use_real_weight)
             ),
             Node(
-                package='weight_detection_module',
+                package='weight_detection_package',
                 executable='weight_detector',
                 name='weight_detector',
                 output='screen',
@@ -289,7 +295,7 @@ echo "FastDDS profile created at /tmp/fastdds_profile.xml"
         actions=[
             LogInfo(msg=['[7/9] Starting Gripper Controller (simulation_mode: ', gripper_simulation_mode, ')...']),
             Node(
-                package='control_module',
+                package='control_package',
                 executable='gripper_controller_node',
                 name='gripper_controller_node',
                 parameters=[{
@@ -329,11 +335,12 @@ echo "FastDDS profile created at /tmp/fastdds_profile.xml"
         actions=[
             LogInfo(msg='[8/9] Starting Cartesian Controller...'),
             Node(
-                package='motion_control_module',
+                package='motion_control_package',
                 executable='cartesian_controller_node',
                 name='cartesian_controller_node',
                 parameters=[{
-                    'use_fake_hardware': use_fake_hardware
+                    'use_fake_hardware': use_fake_hardware,
+                    'controller_name': initial_joint_controller
                 }],
                 output='screen'
             )
@@ -346,7 +353,7 @@ echo "FastDDS profile created at /tmp/fastdds_profile.xml"
         actions=[
             LogInfo(msg='[9/9] Starting Sorting Brain Node...'),
             Node(
-                package='supervisor_module',
+                package='supervisor_package',
                 executable='sorting_brain_node',
                 name='sorting_brain_node',
                 output='screen'

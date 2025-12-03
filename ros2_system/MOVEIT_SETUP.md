@@ -84,7 +84,7 @@ Expected controllers:
 ### Step 3: Start the Cartesian Controller Node
 
 ```bash
-ros2 run motion_control_module cartesian_controller_node
+ros2 run motion_control_package cartesian_controller_node
 ```
 
 You should see:
@@ -139,7 +139,7 @@ ros2 launch ur_moveit_config ur_moveit.launch.py \
 ### Step 4: Start the Cartesian Controller Node (Real Robot)
 
 ```bash
-ros2 run motion_control_module cartesian_controller_node --ros-args -p use_fake_hardware:=false
+ros2 run motion_control_package cartesian_controller_node --ros-args -p use_fake_hardware:=false
 ```
 
 This will use `/scaled_joint_trajectory_controller/follow_joint_trajectory` instead.
@@ -278,7 +278,7 @@ cd /home/mtrn/Documents/mtrn4231_jakos/4231_scripts && ./setupFakeur5e.sh
 
 # Terminal 2: Cartesian controller
 source /home/mtrn/Documents/mtrn4231_jakos/ros2_system/install/setup.bash
-ros2 run motion_control_module cartesian_controller_node
+ros2 run motion_control_package cartesian_controller_node
 ```
 
 ### Start Everything (Real Robot)
@@ -291,7 +291,7 @@ ros2 launch ur_robot_driver ur_control.launch.py ur_type:=ur5e robot_ip:=192.168
 ros2 launch ur_moveit_config ur_moveit.launch.py ur_type:=ur5e use_fake_hardware:=false launch_rviz:=true
 
 # Terminal 3: Cartesian controller
-ros2 run motion_control_module cartesian_controller_node --ros-args -p use_fake_hardware:=false
+ros2 run motion_control_package cartesian_controller_node --ros-args -p use_fake_hardware:=false
 ```
 
 ### Test Movement

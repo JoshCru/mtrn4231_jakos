@@ -1,7 +1,7 @@
 task: detect
 mode: train
 model: yolo11n.pt
-data: C:\Users\Asus\Desktop\UNSW\Year 2\MTRN4231 - Robotics Project\perception_module_6\perception_module\lab3-main\src\object_detect\red_object.v3\data.yaml
+data: C:\Users\Asus\Desktop\UNSW\Year 2\MTRN4231 - Robotics Project\perception_package_6\perception_package\lab3-main\src\object_detect\red_object.v3\data.yaml
 epochs: 50
 time: null
 patience: 100
@@ -103,4 +103,4 @@ auto_augment: randaugment
 erasing: 0.4
 cfg: null
 tracker: botsort.yaml
-save_dir: C:\Users\Asus\Desktop\UNSW\Year 2\MTRN4231 - Robotics Project\perception_module_6\perception_module\lab3-main\src\object_detect\runs\detect\train22
+save_dir: C:\Users\Asus\Desktop\UNSW\Year 2\MTRN4231 - Robotics Project\perception_package_6\perception_package\lab3-main\src\object_detect\runs\detect\train22

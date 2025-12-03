@@ -76,13 +76,13 @@ The system consists of 9 core nodes communicating through topics, services, and 
 │            │           │       │                                │            │
 │            ▼           ▼       ▼                                ▼            │
 │  [9] Sorting Brain ─────────────────────────────────────────────────────────┤
-│    (supervisor_module)                                                       │
+│    (supervisor_package)                                                       │
 │            │                                                                  │
 │            ├──────► /gripper_command ────────► [7] Gripper Controller       │
-│            │                                    (control_module)             │
+│            │                                    (control_package)             │
 │            │                                                                  │
 │            └──────► /cartesian_goal ──────────► [8] Cartesian Controller    │
-│                                                  (motion_control_module)     │
+│                                                  (motion_control_package)     │
 │                                                           │                   │
 │                                                           └─────► MoveIt2    │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -112,7 +112,7 @@ The system consists of 9 core nodes communicating through topics, services, and 
 │         │                  │                   │                        │
 │  ┌──────┴──────────────────┴───────────────────┴──────────┐            │
 │  │                                                          │            │
-│  │              motion_control_module                      │            │
+│  │              motion_control_package                      │            │
 │  │                                                          │            │
 │  │  - cartesian_controller_node                            │            │
 │  │  - go_home                                               │            │
@@ -124,7 +124,7 @@ The system consists of 9 core nodes communicating through topics, services, and 
 │                           │                                              │
 │                           ▼                                              │
 │  ┌────────────────────────────────────────────────────┐                 │
-│  │              control_module                        │                 │
+│  │              control_package                        │                 │
 │  │                                                     │                 │
 │  │  - gripper_controller_node (lifecycle)             │                 │
 │  │                                                     │                 │
@@ -146,42 +146,42 @@ The system consists of 9 core nodes communicating through topics, services, and 
 - Publishes joint states and accepts trajectory commands
 - Runs in simulation mode (fake hardware) or real mode (connected to physical robot via IP)
 
-#### 2. **MoveIt2** (`motion_control_module`)
+#### 2. **MoveIt2** (`motion_control_package`)
 - Motion planning framework providing collision-free trajectories
 - Uses custom URDF with gripper end-effector
 - Provides planning services for pick-and-place operations
 
-#### 3. **Go Home** (`motion_control_module`)
+#### 3. **Go Home** (`motion_control_package`)
 - Initialization script that moves robot to safe home position
 - Executes once during system startup
 
-#### 4. **Safety Boundary Visualizer** (`motion_control_module`)
+#### 4. **Safety Boundary Visualizer** (`motion_control_package`)
 - Publishes RViz markers showing workspace boundaries
 - Monitors for collisions with safety zones
 - Provides visual feedback for safe operation zones
 
-#### 5. **Perception** (`supervisor_module` / `perception_module`)
+#### 5. **Perception** (`supervisor_package` / `perception_package`)
 - **Simulated Mode**: Generates random object positions for testing
 - **Real Mode**: Kevin's perception nodes provide actual object detection from RGBD camera
 - Publishes detected objects with positions and estimated weights
 
-#### 6. **Weight Detector** (`weight_detection_module`)
+#### 6. **Weight Detector** (`weight_detection_package`)
 - Estimates payload mass using UR5e joint torque measurements
 - Uses Kalman filtering and forward kinematics
 - Publishes weight estimates on `/estimated_mass` topic
-- See [Weight Detection Module README](ros2_system/src/weight_detection_module/README.md) for detailed documentation
+- See [Weight Detection Module README](ros2_system/src/weight_detection_package/README.md) for detailed documentation
 
-#### 7. **Gripper Controller** (`control_module`)
+#### 7. **Gripper Controller** (`control_package`)
 - Lifecycle-managed node controlling the custom gripper
 - Interfaces with Arduino-controlled servo gripper
 - Supports simulation mode (no hardware) and real mode (serial communication)
 
-#### 8. **Cartesian Controller** (`motion_control_module`)
+#### 8. **Cartesian Controller** (`motion_control_package`)
 - High-level Cartesian motion interface
 - Converts Cartesian goals to joint trajectories via MoveIt2
 - Handles pick-and-place motion sequences
 
-#### 9. **Sorting Brain** (`supervisor_module`)
+#### 9. **Sorting Brain** (`supervisor_package`)
 - Master state machine orchestrating the entire sorting workflow
 - Sequences: detect → approach → pick → weigh → decide → place
 - Makes sorting decisions based on weight thresholds
@@ -331,20 +331,20 @@ Current Joint Torques → Kalman Filter → Torque Deltas → Kinematics → Mas
 **Compilation:**
 
 ```bash
-colcon build --packages-select weight_detection_module
+colcon build --packages-select weight_detection_package
 source install/setup.bash
-ros2 run weight_detection_module weight_detector
+ros2 run weight_detection_package weight_detector
 ```
 
 **Snapping Toggle:**
 
 Enable:
 ```bash
-ros2 run weight_detection_module weight_detector --ros-args -p useSnapping:=true
+ros2 run weight_detection_package weight_detector --ros-args -p useSnapping:=true
 ```
 Disable:
 ```bash
-ros2 run weight_detection_module weight_detector --ros-args -p useSnapping:=false
+ros2 run weight_detection_package weight_detector --ros-args -p useSnapping:=false
 ```
 
 **Test Scripts:**
@@ -374,7 +374,7 @@ We recommend changing the Buffer size (top left, under "Streaming") to **90 seco
 
 **WARNING**: Only intended for visualisation of torque filtering on all 6 robot joints as this uses an outdated estimator.
 ```bash
-ros2 run weight_detection_module weight_detector_py.py
+ros2 run weight_detection_package weight_detector_py.py
 ```
 
 #### Limitations and Assumptions
@@ -397,7 +397,7 @@ The system provides comprehensive RViz visualization showing:
 
 #### Custom Visualization Scripts
 - `safety_boundary_collision.py` - Publishes workspace boundary markers
-- Custom RViz config files in `motion_control_module/config/`
+- Custom RViz config files in `motion_control_package/config/`
 
 #### Real-Time Feedback
 - Joint states update at 500Hz (decimated to 50Hz for visualization)
@@ -629,9 +629,9 @@ source install/setup.bash
 ### Configuration Files
 
 Key configuration parameters are in:
-- `control_module/config/` - Robot IP, gripper serial port
-- `supervisor_module/config/` - Sorting bins, workspace bounds
-- `motion_control_module/config/` - Motion planning parameters
+- `control_package/config/` - Robot IP, gripper serial port
+- `supervisor_package/config/` - Sorting bins, workspace bounds
+- `motion_control_package/config/` - Motion planning parameters
 
 ### Environment Variables
 
@@ -1146,7 +1146,7 @@ mtrn4231_jakos/
 │       │   ├── srv/                 # Service definitions
 │       │   └── action/              # Action definitions
 │       │
-│       ├── supervisor_module/       # System coordination
+│       ├── supervisor_package/       # System coordination
 │       │   ├── launch/
 │       │   │   └── sorting_system.launch.py
 │       │   ├── scripts/
@@ -1154,18 +1154,18 @@ mtrn4231_jakos/
 │       │   │   └── simulated_perception_node.py
 │       │   └── README.md
 │       │
-│       ├── perception_module/       # Vision system (Kevin's)
+│       ├── perception_package/       # Vision system (Kevin's)
 │       │   ├── src/                 # Object detection, point cloud processing
 │       │   └── README.md
 │       │
-│       ├── weight_detection_module/ # Torque-based weight estimation (Asad's)
+│       ├── weight_detection_package/ # Torque-based weight estimation (Asad's)
 │       │   ├── src/
 │       │   │   └── weight_detector.cpp
 │       │   ├── scripts/
 │       │   │   └── weight_detector_py.py
 │       │   └── README.md            # ⚠️ DO NOT MODIFY (Asad's documentation)
 │       │
-│       ├── motion_control_module/   # Robot motion and planning (Joshua's)
+│       ├── motion_control_package/   # Robot motion and planning (Joshua's)
 │       │   ├── launch/
 │       │   │   └── ur5e_moveit_with_gripper.launch.py
 │       │   ├── urdf/                # Robot URDF/XACRO files
@@ -1176,7 +1176,7 @@ mtrn4231_jakos/
 │       │   ├── config/              # MoveIt configuration
 │       │   └── README.md
 │       │
-│       ├── control_module/          # Low-level control
+│       ├── control_package/          # Low-level control
 │       │   ├── src/
 │       │   │   └── gripper_controller_node.cpp  # Lifecycle gripper control
 │       │   └── README.md
@@ -1206,11 +1206,11 @@ mtrn4231_jakos/
 ### Key Files
 
 - **Launch Files**: `ros2_system/launch/full_system.launch.py`
-- **Sorting Logic**: `supervisor_module/scripts/sorting_brain_node.py`
-- **Weight Detection**: `weight_detection_module/src/weight_detector.cpp`
-- **Gripper Control**: `control_module/src/gripper_controller_node.cpp`
-- **Motion Planning**: `motion_control_module/scripts/cartesian_controller_node.py`
-- **URDF Model**: `motion_control_module/urdf/ur5e_with_end_effector.urdf.xacro`
+- **Sorting Logic**: `supervisor_package/scripts/sorting_brain_node.py`
+- **Weight Detection**: `weight_detection_package/src/weight_detector.cpp`
+- **Gripper Control**: `control_package/src/gripper_controller_node.cpp`
+- **Motion Planning**: `motion_control_package/scripts/cartesian_controller_node.py`
+- **URDF Model**: `motion_control_package/urdf/ur5e_with_end_effector.urdf.xacro`
 
 ---
 

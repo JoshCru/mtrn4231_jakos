@@ -15,8 +15,8 @@ echo -e "${BLUE}Weight Detection Comparison Test${NC}"
 echo -e "${BLUE}======================================${NC}"
 
 # Step 1: Build the package
-echo -e "\n${GREEN}[1/4] Building weight_detection_module...${NC}"
-colcon build --packages-select weight_detection_module
+echo -e "\n${GREEN}[1/4] Building weight_detection_package...${NC}"
+colcon build --packages-select weight_detection_package
 if [ $? -ne 0 ]; then
     echo -e "${RED}Build failed!${NC}"
     exit 1
@@ -30,13 +30,13 @@ source install/setup.bash
 echo -e "\n${GREEN}[3/4] Launching weight detection nodes...${NC}"
 
 echo -e "${BLUE}Starting Python node (/estimated_mass_py)...${NC}"
-ros2 run weight_detection_module weight_detector_py --ros-args -r /estimated_mass:=/estimated_mass_py &
+ros2 run weight_detection_package weight_detector_py --ros-args -r /estimated_mass:=/estimated_mass_py &
 PY_PID=$!
 
 sleep 1
 
 echo -e "${BLUE}Starting C++ node (/estimated_mass_cpp)...${NC}"
-ros2 run weight_detection_module weight_detector --ros-args -r /estimated_mass:=/estimated_mass_cpp &
+ros2 run weight_detection_package weight_detector --ros-args -r /estimated_mass:=/estimated_mass_cpp &
 CPP_PID=$!
 
 sleep 2
@@ -52,7 +52,7 @@ cleanup() {
     kill $PY_PID 2>/dev/null
     kill $CPP_PID 2>/dev/null
     # Force kill the actual binaries
-    pkill -f "weight_detection_module/weight_detector" 2>/dev/null
+    pkill -f "weight_detection_package/weight_detector" 2>/dev/null
     pkill -f "weight_detector_py" 2>/dev/null
     echo -e "${GREEN}Done!${NC}"
 }

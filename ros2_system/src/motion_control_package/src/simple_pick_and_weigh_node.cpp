@@ -30,7 +30,7 @@
 #include <iostream>
 #include <map>
 
-namespace motion_control_module
+namespace motion_control_package
 {
 
 class SimplePickAndWeighNode : public rclcpp::Node
@@ -603,7 +603,7 @@ private:
                               false, false, false, false);
             } else {
                 RCLCPP_WARN(this->get_logger(), "No weight measurement received!");
-                RCLCPP_WARN(this->get_logger(), "Check that weight_detection_module is running");
+                RCLCPP_WARN(this->get_logger(), "Check that weight_detection_package is running");
                 publish_status("WARNING", "No weight measurement received from weight detection module",
                               false, false, false, false);
             }
@@ -640,13 +640,13 @@ private:
     std::mutex weight_mutex_;
 };
 
-}  // namespace motion_control_module
+}  // namespace motion_control_package
 
 int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
 
-    auto node = std::make_shared<motion_control_module::SimplePickAndWeighNode>();
+    auto node = std::make_shared<motion_control_package::SimplePickAndWeighNode>();
 
     // Use MultiThreadedExecutor to allow callbacks to run during service handling
     rclcpp::executors::MultiThreadedExecutor executor;

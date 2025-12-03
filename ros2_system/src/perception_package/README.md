@@ -117,7 +117,7 @@ base_link
 ## 6. How to Run
 ### A) Recommended (Launch File)
 ```nginx
-ros2 launch perception_module object_detect.launch.py
+ros2 launch perception_package object_detect.launch.py
 ```
 Your launch file automatically:
 
@@ -140,7 +140,7 @@ ros2 run tf2_ros static_transform_publisher 1.30938 0.0206053 0.670571 -0.398486
 ```bash
 colcon build
 source install/setup.bash
-ros2 run perception_module object_detect_yolo \
+ros2 run perception_package object_detect_yolo \
   --ros-args \
   -p yolo_weights:=/runs/detect/train/weights/best.pt \
   -p target_class_name:=red_object
@@ -148,8 +148,8 @@ ros2 run perception_module object_detect_yolo \
 
 ## 7. Package Structure
 ```arduino
-perception_module/
-├── perception_module/
+perception_package/
+├── perception_package/
 │   ├── object_detect_yolo.py
 ├── launch/
 │   ├── object_detect.launch.py

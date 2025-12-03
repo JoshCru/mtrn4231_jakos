@@ -2,13 +2,13 @@
 
 This document identifies which files can be safely removed from ros2_system based on usage in all .sh scripts.
 
-**NOTE: perception_module is KEPT intact - Kevin is still working on it**
+**NOTE: perception_package is KEPT intact - Kevin is still working on it**
 
 ---
 
 ## Files TO KEEP (Used by shell scripts)
 
-### control_module
+### control_package
 ✅ **KEEP:**
 - `src/gripper_controller_node.cpp` - Used by multiple scripts
 - `config/gripper_params.yaml` - Likely used by gripper_controller_node
@@ -29,7 +29,7 @@ This document identifies which files can be safely removed from ros2_system base
 - `test/test_gripper_simulation.py` - Test file
 - `urdf/gripper.urdf` - NOT used (we use xacro version)
 
-### motion_control_module
+### motion_control_package
 ✅ **KEEP:**
 - `src/cartesian_controller_node.cpp` - Used by multiple scripts
 - `src/simple_pick_and_weigh_node.cpp` - Used by runSimplePickAndWeigh.sh
@@ -47,7 +47,7 @@ This document identifies which files can be safely removed from ros2_system base
 - `launch/ur5e_real_with_gripper.launch.py` - NOT used in any script
 - `urdf/gripper.urdf` - NOT used (we use xacro in end_effector)
 
-### perception_module
+### perception_package
 ✅ **KEEP EVERYTHING** - Kevin is working on this
 
 ### planning_module
@@ -59,16 +59,16 @@ This document identifies which files can be safely removed from ros2_system base
 - `config/planning.yaml` - NOT used
 - `launch/planning.launch.py` - NOT used
 
-### supervisor_module
+### supervisor_package
 ✅ **KEEP:**
-- `supervisor_module/simulated_perception_node.py` - Used by multiple scripts
-- `supervisor_module/sorting_brain_node.py` - Used by multiple scripts
-- `supervisor_module/system_dashboard.py` - Used by launchDashboard.sh
-- `supervisor_module/__init__.py` - Python package requirement
+- `supervisor_package/simulated_perception_node.py` - Used by multiple scripts
+- `supervisor_package/sorting_brain_node.py` - Used by multiple scripts
+- `supervisor_package/system_dashboard.py` - Used by launchDashboard.sh
+- `supervisor_package/__init__.py` - Python package requirement
 - `setup.py` - Python package requirement
 
 ❌ **REMOVE:**
-- `include/supervisor_module/brain_node.hpp` - C++ version NOT used
+- `include/supervisor_package/brain_node.hpp` - C++ version NOT used
 - `config/system_controller.yaml` - NOT referenced
 - `launch/sorting_system.launch.py` - NOT used (scripts use modular approach)
 
@@ -81,15 +81,15 @@ This document identifies which files can be safely removed from ros2_system base
 - `test/test_flake8.py`
 - `test/test_pep257.py`
 
-### weight_detection_module
+### weight_detection_package
 ✅ **KEEP:**
 - `src/weight_detector.cpp` - Used by multiple scripts
-- `weight_detection_module/__init__.py` - Python package requirement
+- `weight_detection_package/__init__.py` - Python package requirement
 - `setup.py` - Package requirement
 
 ❌ **REMOVE:**
-- `weight_detection_module/old.py` - Old/unused code
-- `weight_detection_module/weight_detector_py.py` - Python version used only in test scripts (keep if you want tests)
+- `weight_detection_package/old.py` - Old/unused code
+- `weight_detection_package/weight_detector_py.py` - Python version used only in test scripts (keep if you want tests)
 - `launch/weight_detection.launch.py` - NOT used
 
 ### sort_interfaces
@@ -103,9 +103,9 @@ This document identifies which files can be safely removed from ros2_system base
 1. **planning_module** (entire directory)
 2. **util_arduino_serial** (entire directory)
 
-### Files to Remove from control_module:
+### Files to Remove from control_package:
 ```
-control_module/
+control_package/
 ├── src/
 │   ├── gripper_button_interface.cpp          ❌
 │   ├── pick_operation_node.cpp                ❌
@@ -126,9 +126,9 @@ control_module/
     └── gripper.urdf                           ❌
 ```
 
-### Files to Remove from motion_control_module:
+### Files to Remove from motion_control_package:
 ```
-motion_control_module/
+motion_control_package/
 ├── scripts/
 │   └── simple_pick_and_weigh.py               ❌
 ├── launch/
@@ -137,10 +137,10 @@ motion_control_module/
     └── gripper.urdf                           ❌
 ```
 
-### Files to Remove from supervisor_module:
+### Files to Remove from supervisor_package:
 ```
-supervisor_module/
-├── include/supervisor_module/
+supervisor_package/
+├── include/supervisor_package/
 │   └── brain_node.hpp                         ❌
 ├── config/
 │   └── system_controller.yaml                 ❌
@@ -148,10 +148,10 @@ supervisor_module/
     └── sorting_system.launch.py               ❌
 ```
 
-### Files to Remove from weight_detection_module:
+### Files to Remove from weight_detection_package:
 ```
-weight_detection_module/
-├── weight_detection_module/
+weight_detection_package/
+├── weight_detection_package/
 │   ├── old.py                                 ❌
 │   └── weight_detector_py.py                  ❌ (optional - used in tests)
 └── launch/
@@ -164,7 +164,7 @@ weight_detection_module/
 
 ### Files that will be removed: ~30 files
 ### Complete packages removed: 2 (planning_module, util_arduino_serial)
-### Packages preserved: 6 (control_module, motion_control_module, perception_module, supervisor_module, weight_detection_module, sort_interfaces)
+### Packages preserved: 6 (control_package, motion_control_package, perception_package, supervisor_package, weight_detection_package, sort_interfaces)
 
 ### Space savings estimate:
 - planning_module: ~4 source files + configs

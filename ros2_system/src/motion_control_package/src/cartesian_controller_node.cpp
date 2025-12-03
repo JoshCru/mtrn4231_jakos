@@ -29,7 +29,7 @@
 #include <atomic>
 #include <condition_variable>
 
-namespace motion_control_module
+namespace motion_control_package
 {
 
 // Robot joint names
@@ -70,10 +70,9 @@ public:
         this->declare_parameter("use_fake_hardware", true);
         use_fake_hardware_ = this->get_parameter("use_fake_hardware").as_bool();
 
-        // Both simulation and real hardware use scaled_joint_trajectory_controller
-        // Simulation: explicitly set in launch
-        // Real hardware: default controller
-        controller_name_ = "/scaled_joint_trajectory_controller/follow_joint_trajectory";
+        // Get controller name from parameters
+        this->declare_parameter<std::string>("controller_name", "scaled_joint_trajectory_controller");
+        controller_name_ = this->get_parameter("controller_name").as_string();
 
         RCLCPP_INFO(this->get_logger(), "Using controller: %s", controller_name_.c_str());
 
@@ -333,6 +332,14 @@ private:
             path_response->fraction * 100,
             path_response->solution.joint_trajectory.points.size());
 
+        // Check if action server is ready before sending goal
+        if (!trajectory_action_client_->wait_for_action_server(std::chrono::seconds(5))) {
+            RCLCPP_ERROR(this->get_logger(), "Trajectory action server not available!");
+            response->success = false;
+            response->message = "Trajectory action server not available after planning";
+            return;
+        }
+
         // Execute trajectory
         auto trajectory_goal = FollowJointTrajectory::Goal();
         trajectory_goal.trajectory = path_response->solution.joint_trajectory;
@@ -466,13 +473,13 @@ private:
     std::mutex joint_state_mutex_;
 };
 
-}  // namespace motion_control_module
+}  // namespace motion_control_package
 
 int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
 
-    auto node = std::make_shared<motion_control_module::CartesianControllerNode>();
+    auto node = std::make_shared<motion_control_package::CartesianControllerNode>();
 
     // Use MultiThreadedExecutor to allow callbacks to run during service handling
     rclcpp::executors::MultiThreadedExecutor executor;

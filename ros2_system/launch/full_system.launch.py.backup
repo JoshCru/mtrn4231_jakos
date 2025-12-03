@@ -38,7 +38,7 @@ def generate_launch_description():
 
     # Brain Node - Central Orchestrator
     brain_node = Node(
-        package='supervisor_module',
+        package='supervisor_package',
         executable='brain_node',
         name='brain_node',
         output='screen',
@@ -56,7 +56,7 @@ def generate_launch_description():
     supervisor_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             PathJoinSubstitution([
-                FindPackageShare('supervisor_module'),
+                FindPackageShare('supervisor_package'),
                 'launch',
                 'supervisor.launch.py'
             ])
@@ -70,7 +70,7 @@ def generate_launch_description():
     perception_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             PathJoinSubstitution([
-                FindPackageShare('perception_module'),
+                FindPackageShare('perception_package'),
                 'launch',
                 'perception.launch.py'
             ])
@@ -113,7 +113,7 @@ def generate_launch_description():
     control_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             PathJoinSubstitution([
-                FindPackageShare('control_module'),
+                FindPackageShare('control_package'),
                 'launch',
                 'control.launch.py'
             ])
@@ -123,11 +123,11 @@ def generate_launch_description():
         }.items()
     )
 
-    # Motion control module - REMOVED: gripper_controller_node moved to control_module
+    # Motion control module - REMOVED: gripper_controller_node moved to control_package
     # motion_control_launch = IncludeLaunchDescription(
     #     PythonLaunchDescriptionSource([
     #         PathJoinSubstitution([
-    #             FindPackageShare('motion_control_module'),
+    #             FindPackageShare('motion_control_package'),
     #             'launch',
     #             'motion_control.launch.py'
     #         ])
@@ -138,7 +138,7 @@ def generate_launch_description():
     weight_detection_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             PathJoinSubstitution([
-                FindPackageShare('weight_detection_module'),
+                FindPackageShare('weight_detection_package'),
                 'launch',
                 'weight_detection.launch.py'
             ])
@@ -160,7 +160,7 @@ def generate_launch_description():
         name='rviz2',
         output='screen',
         arguments=['-d', PathJoinSubstitution([
-            FindPackageShare('supervisor_module'),  # Or create dedicated config package
+            FindPackageShare('supervisor_package'),  # Or create dedicated config package
             'config',
             'sort_system.rviz'
         ])],
@@ -169,7 +169,7 @@ def generate_launch_description():
 
     # Brain Dashboard (delayed launch to ensure nodes are up)
     brain_dashboard = ExecuteProcess(
-        cmd=['ros2', 'run', 'supervisor_module', 'brain_dashboard'],
+        cmd=['ros2', 'run', 'supervisor_package', 'brain_dashboard'],
         output='screen',
         shell=False,
     )
@@ -195,7 +195,7 @@ def generate_launch_description():
         control_launch,
         weight_detection_launch,
         arduino_serial_node,
-        # motion_control_launch,  # REMOVED: gripper_controller_node moved to control_module
+        # motion_control_launch,  # REMOVED: gripper_controller_node moved to control_package
 
         # Brain Dashboard UI (delayed)
         delayed_dashboard,

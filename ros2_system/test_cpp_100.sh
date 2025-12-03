@@ -15,8 +15,8 @@ echo -e "${BLUE}C++ Weight Detection Test - 100g${NC}"
 echo -e "${BLUE}======================================${NC}"
 
 # Step 1: Build the package
-echo -e "\n${GREEN}[1/3] Building weight_detection_module...${NC}"
-colcon build --packages-select weight_detection_module
+echo -e "\n${GREEN}[1/3] Building weight_detection_package...${NC}"
+colcon build --packages-select weight_detection_package
 if [ $? -ne 0 ]; then
     echo -e "${RED}Build failed!${NC}"
     exit 1
@@ -29,7 +29,7 @@ source install/setup.bash
 # Step 3: Launch C++ node in background
 echo -e "\n${GREEN}[3/3] Launching C++ weight detection node...${NC}"
 echo -e "${BLUE}Starting C++ node (/estimated_mass)...${NC}"
-ros2 run weight_detection_module weight_detector --ros-args -p useSnapping:=true &
+ros2 run weight_detection_package weight_detector --ros-args -p useSnapping:=true &
 CPP_PID=$!
 
 sleep 2
@@ -44,7 +44,7 @@ cleanup() {
     echo -e "\n${RED}Stopping C++ node...${NC}"
     kill $CPP_PID 2>/dev/null
     # Force kill the actual binary in case ros2 run didn't propagate the signal
-    pkill -f "weight_detection_module/weight_detector" 2>/dev/null
+    pkill -f "weight_detection_package/weight_detector" 2>/dev/null
     echo -e "${GREEN}Done!${NC}"
 }
 

@@ -94,7 +94,7 @@
    </xacro:ur_robot>
 
    <!-- Include end effector -->
-   <xacro:include filename="$(find motion_control_module)/urdf/gripper.urdf"/>
+   <xacro:include filename="$(find motion_control_package)/urdf/gripper.urdf"/>
 
    <!-- Coupler between arm and end effector -->
    <joint name="ur5e_gripper_coupler_joint" type="fixed">

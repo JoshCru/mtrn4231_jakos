@@ -61,19 +61,19 @@ Current Joint Torques → Kalman Filter → Torque Deltas → Kinematics → Mas
 ### Compilation
 
 ```bash
-colcon build --packages-select weight_detection_module
+colcon build --packages-select weight_detection_package
 source install/setup.bash
-ros2 run weight_detection_module weight_detector
+ros2 run weight_detection_package weight_detector
 ```
 
 #### Snapping Toggle
 Enable:
 ```bash
-ros2 run weight_detection_module weight_detector --ros-args -p useSnapping:=true
+ros2 run weight_detection_package weight_detector --ros-args -p useSnapping:=true
 ```
 Disable:
 ```bash
-ros2 run weight_detection_module weight_detector --ros-args -p useSnapping:=false
+ros2 run weight_detection_package weight_detector --ros-args -p useSnapping:=false
 ```
 
 ### Test Scripts
@@ -103,7 +103,7 @@ We recommend changing the Buffer size (top left, under "Streaming") to **90 seco
 #### Alternative: Python Node
 **WARNING**: Only intended for visualisation of torque filtering on all 6 robot joints as this uses an outdated estimator.
 ```bash
-ros2 run weight_detection_module weight_detector_py
+ros2 run weight_detection_package weight_detector_py
 ```
 
 ## Limitations and Assumptions

@@ -200,7 +200,7 @@ class SortingBrainNode(Node):
             callback_group=self.callback_group
         )
 
-        # Weight estimation from Asad's weight_detection_module
+        # Weight estimation from Asad's weight_detection_package
         self.weight_estimate_sub = self.create_subscription(
             Int32,
             '/recognition/estimated_mass',
@@ -336,7 +336,7 @@ class SortingBrainNode(Node):
             self.get_logger().info(f'Detected {len(valid_objects)} objects in picking area')
 
     def weight_estimate_callback(self, msg: Int32):
-        """Handle weight estimate from Asad's weight_detection_module."""
+        """Handle weight estimate from Asad's weight_detection_package."""
         # Accept weight (no object_id matching needed as weight detector measures what's held)
         self.current_weight = float(msg.data)
         self.get_logger().info(f'Received weight estimate: {msg.data}g')

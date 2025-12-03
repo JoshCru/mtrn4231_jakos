@@ -108,6 +108,7 @@ if [ "$SIM_ROBOT" = true ]; then
         robot_ip:=$ROBOT_IP \
         use_fake_hardware:=true \
         launch_rviz:=false \
+        initial_joint_controller:=scaled_joint_trajectory_controller \
         description_file:=ur5e_with_end_effector.urdf.xacro \
         description_package:=motion_control_package &
 else

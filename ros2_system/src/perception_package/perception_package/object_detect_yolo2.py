@@ -27,7 +27,7 @@ class YOLObjectDetect(Node):
 
         # ---------- Parameters ----------
         default_weights = os.path.expanduser(
-            '~/Downloads/perception_module_10/perception_module/lab3-main/src/object_detect/best.pt'
+            '~/Downloads/perception_package_10/perception_package/lab3-main/src/object_detect/best.pt'
         )
         self.declare_parameter('yolo_weights', default_weights)
         self.declare_parameter('conf_thres', 0.25)

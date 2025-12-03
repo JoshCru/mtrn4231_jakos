@@ -16,23 +16,23 @@ This document analyzes all nodes, packages, scripts, and messages used by `start
 | Resource | Type | Location | Status |
 |----------|------|----------|--------|
 | `ur_robot_driver/ur_control.launch.py` | Launch File | External Package (ur_robot_driver) | ✅ External (from apt) |
-| `motion_control_module/ur5e_moveit_with_gripper.launch.py` | Launch File | `/ros2_system/src/motion_control_module/launch/` | ✅ Found |
+| `motion_control_package/ur5e_moveit_with_gripper.launch.py` | Launch File | `/ros2_system/src/motion_control_package/launch/` | ✅ Found |
 
 ### URDF/Xacro Files
 | Resource | Type | Location | Status |
 |----------|------|----------|--------|
-| `ur5e_with_end_effector.urdf.xacro` | URDF Xacro | `/ros2_system/src/motion_control_module/urdf/` | ✅ Found |
+| `ur5e_with_end_effector.urdf.xacro` | URDF Xacro | `/ros2_system/src/motion_control_package/urdf/` | ✅ Found |
 
 ### Nodes (Executables)
 | Node | Package | Source File | Status |
 |------|---------|-------------|--------|
-| `gripper_controller_node` | control_module | `/ros2_system/src/control_module/src/gripper_controller_node.cpp` | ✅ Found |
-| `cartesian_controller_node` | motion_control_module | `/ros2_system/src/motion_control_module/src/cartesian_controller_node.cpp` | ✅ Found |
+| `gripper_controller_node` | control_package | `/ros2_system/src/control_package/src/gripper_controller_node.cpp` | ✅ Found |
+| `cartesian_controller_node` | motion_control_package | `/ros2_system/src/motion_control_package/src/cartesian_controller_node.cpp` | ✅ Found |
 
 ### Python Scripts
 | Script | Location | Status |
 |--------|----------|--------|
-| `safety_boundary_collision.py` | `/ros2_system/src/motion_control_module/scripts/` | ✅ Found |
+| `safety_boundary_collision.py` | `/ros2_system/src/motion_control_package/scripts/` | ✅ Found |
 
 ### ROS2 Commands Used
 | Command | Purpose | Status |
@@ -49,16 +49,16 @@ This document analyzes all nodes, packages, scripts, and messages used by `start
 ### Nodes (Executables)
 | Node | Package | Source File | Status |
 |------|---------|-------------|--------|
-| `go_home` | motion_control_module | `/ros2_system/src/motion_control_module/scripts/go_home.py` | ✅ Found |
-| `simulated_perception_node` | supervisor_module | `/ros2_system/src/supervisor_module/supervisor_module/simulated_perception_node.py` | ✅ Found |
-| `weight_detector` | weight_detection_module | `/ros2_system/src/weight_detection_module/src/weight_detector.cpp` | ✅ Found |
-| `sorting_brain_node` | supervisor_module | `/ros2_system/src/supervisor_module/supervisor_module/sorting_brain_node.py` | ✅ Found |
-| `simple_pick_and_weigh_node` | motion_control_module | `/ros2_system/src/motion_control_module/src/simple_pick_and_weigh_node.cpp` | ✅ Found |
+| `go_home` | motion_control_package | `/ros2_system/src/motion_control_package/scripts/go_home.py` | ✅ Found |
+| `simulated_perception_node` | supervisor_package | `/ros2_system/src/supervisor_package/supervisor_package/simulated_perception_node.py` | ✅ Found |
+| `weight_detector` | weight_detection_package | `/ros2_system/src/weight_detection_package/src/weight_detector.cpp` | ✅ Found |
+| `sorting_brain_node` | supervisor_package | `/ros2_system/src/supervisor_package/supervisor_package/sorting_brain_node.py` | ✅ Found |
+| `simple_pick_and_weigh_node` | motion_control_package | `/ros2_system/src/motion_control_package/src/simple_pick_and_weigh_node.cpp` | ✅ Found |
 
 ### Python Scripts
 | Script | Location | Status |
 |--------|----------|--------|
-| `check_simulated_positions.py` | `/ros2_system/src/motion_control_module/scripts/` | ✅ Found |
+| `check_simulated_positions.py` | `/ros2_system/src/motion_control_package/scripts/` | ✅ Found |
 | `plot_weight.sh` | `/ros2_system/` | ✅ Found |
 
 ### Message Types Used
@@ -79,11 +79,11 @@ All packages referenced by the scripts exist in `/ros2_system/src/`:
 
 | Package Name | Used By | Status |
 |--------------|---------|--------|
-| `control_module` | Persistent (gripper_controller_node) | ✅ Present |
-| `motion_control_module` | Both scripts (multiple nodes/scripts) | ✅ Present |
-| `supervisor_module` | Temporary (perception, sorting brain) | ✅ Present |
-| `weight_detection_module` | Temporary (weight_detector) | ✅ Present |
-| `perception_module` | Not used in scripts | ⚠️ Available but unused |
+| `control_package` | Persistent (gripper_controller_node) | ✅ Present |
+| `motion_control_package` | Both scripts (multiple nodes/scripts) | ✅ Present |
+| `supervisor_package` | Temporary (perception, sorting brain) | ✅ Present |
+| `weight_detection_package` | Temporary (weight_detector) | ✅ Present |
+| `perception_package` | Not used in scripts | ⚠️ Available but unused |
 | `planning_module` | Not used in scripts | ⚠️ Available but unused |
 | `sort_interfaces` | Used indirectly by nodes | ✅ Present |
 | `util_arduino_serial` | Not used in scripts | ⚠️ Available but unused |
@@ -136,27 +136,27 @@ The following packages/nodes exist in ros2_system but are **not** used by the mo
 ### Unused Packages
 | Package | Location | Notes |
 |---------|----------|-------|
-| `perception_module` | `/ros2_system/src/perception_module/` | Contains real perception (YOLO-based), could be used with `--real-perception` flag (not yet implemented) |
+| `perception_package` | `/ros2_system/src/perception_package/` | Contains real perception (YOLO-based), could be used with `--real-perception` flag (not yet implemented) |
 | `planning_module` | `/ros2_system/src/planning_module/` | Contains verification and integrity nodes |
 | `util_arduino_serial` | `/ros2_system/src/util_arduino_serial/` | Arduino communication utilities |
 
 ### Unused Nodes from Used Packages
 | Node | Package | Source File | Notes |
 |------|---------|-------------|-------|
-| `brain_node` | supervisor_module | `src/supervisor_module/src/brain_node.cpp` | C++ version of sorting brain |
-| `pick_operation_node` | control_module | `src/control_module/src/pick_operation_node.cpp` | Pick action server |
-| `place_operation_node` | control_module | `src/control_module/src/place_operation_node.cpp` | Place action server |
-| `robot_driver_node` | control_module | `src/control_module/src/robot_driver_node.cpp` | Custom robot driver |
+| `brain_node` | supervisor_package | `src/supervisor_package/src/brain_node.cpp` | C++ version of sorting brain |
+| `pick_operation_node` | control_package | `src/control_package/src/pick_operation_node.cpp` | Pick action server |
+| `place_operation_node` | control_package | `src/control_package/src/place_operation_node.cpp` | Place action server |
+| `robot_driver_node` | control_package | `src/control_package/src/robot_driver_node.cpp` | Custom robot driver |
 | `verification_node` | planning_module | `src/planning_module/src/verification_node.cpp` | Weight verification |
 | `integrity_node` | planning_module | `src/planning_module/src/integrity_node.cpp` | System integrity checks |
-| `weight_detector_py.py` | weight_detection_module | Python version of weight detector |
-| `object_detect_yolo.py` | perception_module | YOLO-based object detection |
-| `system_dashboard.py` | supervisor_module | System dashboard UI |
+| `weight_detector_py.py` | weight_detection_package | Python version of weight detector |
+| `object_detect_yolo.py` | perception_package | YOLO-based object detection |
+| `system_dashboard.py` | supervisor_package | System dashboard UI |
 
 ### Unused Launch Files
 | Launch File | Package | Location | Notes |
 |-------------|---------|----------|-------|
-| `sorting_system.launch.py` | supervisor_module | `src/supervisor_module/launch/` | All-in-one launch file |
+| `sorting_system.launch.py` | supervisor_package | `src/supervisor_package/launch/` | All-in-one launch file |
 
 ### Unused Custom Messages/Services/Actions
 All custom messages, services, and actions in `sort_interfaces` are used **indirectly** by the nodes that are launched. The scripts themselves don't directly publish/subscribe to these, but the nodes they launch do.
@@ -197,7 +197,7 @@ The `--real-perception` flag in `start_temporary.sh` is **not yet implemented**.
 # Line 141-153 in start_temporary.sh
 if [ "$SIM_PERCEPTION" = true ]; then
     # Simulated perception is implemented ✅
-    ros2 run supervisor_module simulated_perception_node ...
+    ros2 run supervisor_package simulated_perception_node ...
 else
     # Real perception is NOT implemented ❌
     echo "  WARNING: Real perception not yet configured!"
@@ -207,12 +207,12 @@ fi
 ### Available for Real Perception
 | Resource | Location | Status |
 |----------|----------|--------|
-| `object_detect_yolo.py` | `/ros2_system/src/perception_module/perception_module/` | ✅ Available |
+| `object_detect_yolo.py` | `/ros2_system/src/perception_package/perception_package/` | ✅ Available |
 
 ### To Implement Real Perception
 You would need to add something like:
 ```bash
-ros2 run perception_module object_detect_yolo &
+ros2 run perception_package object_detect_yolo &
 ```
 
 ---
@@ -238,23 +238,23 @@ ros2 run perception_module object_detect_yolo &
 start_persistent.sh
 ├── ur_robot_driver (external)
 │   └── ur_control.launch.py
-├── motion_control_module
+├── motion_control_package
 │   ├── ur5e_moveit_with_gripper.launch.py
 │   ├── ur5e_with_end_effector.urdf.xacro
 │   ├── cartesian_controller_node
 │   └── safety_boundary_collision.py
-└── control_module
+└── control_package
     └── gripper_controller_node
 
 start_temporary.sh
-├── motion_control_module
+├── motion_control_package
 │   ├── go_home
 │   ├── simple_pick_and_weigh_node
 │   └── check_simulated_positions.py
-├── supervisor_module
+├── supervisor_package
 │   ├── simulated_perception_node
 │   └── sorting_brain_node
-├── weight_detection_module
+├── weight_detection_package
 │   └── weight_detector
 └── ros2_system
     └── plot_weight.sh
@@ -264,7 +264,7 @@ start_temporary.sh
 
 ## 10. Recommendations
 
-1. **Real Perception Implementation**: Implement the real perception mode using the existing `object_detect_yolo.py` from `perception_module`
+1. **Real Perception Implementation**: Implement the real perception mode using the existing `object_detect_yolo.py` from `perception_package`
 
 2. **Consider Using Unused Nodes**:
    - `verification_node` for weight verification

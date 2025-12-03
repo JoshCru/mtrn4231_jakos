@@ -36,15 +36,20 @@ class GoHomeNode(Node):
     def __init__(self):
         super().__init__('go_home_node')
 
+        self.declare_parameter('controller_name', 'scaled_joint_trajectory_controller')
+        controller_name = self.get_parameter('controller_name').as_string()
+        action_server_name = f'/{controller_name}/follow_joint_trajectory'
+
         self.action_client = ActionClient(
             self,
             FollowJointTrajectory,
-            '/scaled_joint_trajectory_controller/follow_joint_trajectory'
+            action_server_name
         )
 
-        self.get_logger().info('Waiting for joint trajectory action server...')
+        self.get_logger().info(f'Waiting for action server: {action_server_name}...')
         if not self.action_client.wait_for_server(timeout_sec=30.0):
             self.get_logger().error('Action server not available!')
+            # Allow node to be created, but go_home will fail
             return
 
         self.get_logger().info('Action server ready')
