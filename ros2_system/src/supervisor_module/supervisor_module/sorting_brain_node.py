@@ -740,14 +740,17 @@ class SortingBrainNode(Node):
 
         try:
             # Step 1: Put current weight back at its original pick position (in picking area)
-            # Optimize: go directly to pickup height without lifting to home
-            self.get_logger().info(f'=== REARRANGING: Returning weight to original position ({staging_x:.1f}, {staging_y:.1f}) ===')
+            # Robot is already at (staging_x, staging_y, Z_DESCEND) from the weighing phase
+            # No need for staged movement - we're already here!
+            self.get_logger().info(f'=== REARRANGING: Returning weight to staging position ({staging_x:.1f}, {staging_y:.1f}) ===')
 
-            # Move directly to staging position at pickup height (no need to lift to home)
+            # Simply descend from Z_DESCEND to Z_PICKUP (we're already at the right x,y)
             if not self.move_to(staging_x, staging_y, self.Z_PICKUP):
-                self.get_logger().error('Failed to move to staging position')
+                self.get_logger().error('Failed to descend to Z_PICKUP at staging')
                 self.transition_state(SortingState.ERROR)
                 return
+
+            # Open gripper to release weight
             if not self.gripper_control('W', wait_time_sec=5.0):
                 self.get_logger().error('Failed to open gripper at staging')
                 self.transition_state(SortingState.ERROR)
@@ -763,9 +766,9 @@ class SortingBrainNode(Node):
                 self.add_object_pub.publish(add_msg)
                 self.get_logger().info(f'Notified perception: re-added object {self.current_object_id} to picking area')
 
-            # Lift slightly to clear the weight
-            if not self.move_to(staging_x, staging_y, self.Z_DESCEND):
-                self.get_logger().error('Failed to retreat from staging')
+            # Lift to Z_HOME for safe travel to existing weights
+            if not self.move_to(staging_x, staging_y, self.Z_HOME):
+                self.get_logger().error('Failed to lift to Z_HOME from staging')
 
             # Step 2: Move weights from rightmost down to insert_index, each one position right
             # We need to recalculate all positions based on the new total
@@ -778,7 +781,7 @@ class SortingBrainNode(Node):
 
                 self.get_logger().info(f'Moving weight {pw.object_id} ({pw.weight_grams:.0f}g) from pos {i} to pos {i+1}')
 
-                # Pick up the weight
+                # Pick up the weight - go through Z_HOME via staged movement
                 if not self.move_staged(old_x, old_y, self.Z_DESCEND):
                     continue
                 if not self.move_to(old_x, old_y, self.Z_PICKUP):
@@ -786,10 +789,11 @@ class SortingBrainNode(Node):
                 if not self.gripper_control('S', wait_time_sec=5.0):
                     continue
                 self.holding_object = True
-                if not self.move_to(old_x, old_y, self.Z_DESCEND):
+                # Lift to Z_HOME for safe travel
+                if not self.move_to(old_x, old_y, self.Z_HOME):
                     continue
 
-                # Place at new position
+                # Place at new position - go through Z_HOME via staged movement
                 if not self.move_staged(new_x, new_y, self.Z_DESCEND):
                     continue
                 if not self.move_to(new_x, new_y, self.Z_PLACE):
@@ -797,7 +801,8 @@ class SortingBrainNode(Node):
                 if not self.gripper_control('W', wait_time_sec=5.0):
                     continue
                 self.holding_object = False
-                if not self.move_to(new_x, new_y, self.Z_DESCEND):
+                # Lift to Z_HOME for safe travel to next position
+                if not self.move_to(new_x, new_y, self.Z_HOME):
                     pass
 
                 # Update stored position
@@ -805,8 +810,12 @@ class SortingBrainNode(Node):
                 pw.y_mm = new_y
 
             # Step 3: Pick up the weight from its original pick position
-            # Optimize: descend directly to pickup height (we're already at staging_x, staging_y, Z_DESCEND)
+            # Use staged movement to return to staging position safely
             self.get_logger().info(f'Picking up weight from original position ({staging_x:.1f}, {staging_y:.1f})')
+            if not self.move_staged(staging_x, staging_y, self.Z_DESCEND):
+                self.get_logger().error('Failed to move to staging position (staged)')
+                self.transition_state(SortingState.ERROR)
+                return
             if not self.move_to(staging_x, staging_y, self.Z_PICKUP):
                 self.get_logger().error('Failed to descend to pickup at staging')
                 self.transition_state(SortingState.ERROR)
@@ -826,8 +835,8 @@ class SortingBrainNode(Node):
                 self.remove_object_pub.publish(remove_msg)
                 self.get_logger().info(f'Notified perception: removed object {self.current_object_id} (picked back up)')
 
-            # Lift to clear
-            if not self.move_to(staging_x, staging_y, self.Z_DESCEND):
+            # Lift to Z_HOME for safe travel
+            if not self.move_to(staging_x, staging_y, self.Z_HOME):
                 pass
 
             # Step 4: Calculate final position for the new weight

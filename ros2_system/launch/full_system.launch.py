@@ -97,40 +97,11 @@ def generate_launch_description():
     # For real hardware, use scaled_joint_trajectory_controller
     # For simulation, use joint_trajectory_controller
     initial_joint_controller = PythonExpression([
-        "'scaled_joint_trajectory_controller' if '", mode, "' != 'simulation' else 'joint_trajectory_controller'"
+        "'scaled_joint_trajectory_controller' if '", mode, "' == 'simulation' else 'joint_trajectory_controller'"
     ])
 
     # Find package shares
     motion_control_share = FindPackageShare('motion_control_module')
-
-    # ==================== FastDDS Profile Setup ====================
-    # Create FastDDS profile for reliable communication
-    fastdds_profile_setup = ExecuteProcess(
-        cmd=['bash', '-c', '''
-cat > /tmp/fastdds_profile.xml << 'EOF'
-<?xml version="1.0" encoding="UTF-8" ?>
-<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
-    <transport_descriptors>
-        <transport_descriptor>
-            <transport_id>CustomUdpTransport</transport_id>
-            <type>UDPv4</type>
-        </transport_descriptor>
-    </transport_descriptors>
-    <participant profile_name="participant_profile" is_default_profile="true">
-        <rtps>
-            <userTransports>
-                <transport_id>CustomUdpTransport</transport_id>
-            </userTransports>
-            <useBuiltinTransports>false</useBuiltinTransports>
-        </rtps>
-    </participant>
-</profiles>
-EOF
-echo "FastDDS profile created at /tmp/fastdds_profile.xml"
-        '''],
-        output='screen',
-        shell=True
-    )
 
     # ==================== UR5e Driver ====================
     ur_driver = TimerAction(
@@ -148,7 +119,7 @@ echo "FastDDS profile created at /tmp/fastdds_profile.xml"
                 launch_arguments={
                     'ur_type': 'ur5e',
                     'robot_ip': robot_ip,
-                    'initial_joint_controller': initial_joint_controller,
+                    'initial_joint_controller': scaled_initial_joint_controller,
                     'use_fake_hardware': use_fake_hardware,
                     'launch_rviz': 'false',
                     'description_file': 'ur5e_with_end_effector.urdf.xacro',
