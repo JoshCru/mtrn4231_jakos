@@ -123,13 +123,15 @@ class UR5eKinematics:
 
 class WeightDetector(Node):
     def __init__(self):
-        super().__init__('weight_detector')
+        super().__init__('weight_detector_py')
         
         # Timing tracking - use time.time() for more accurate measurement
         self.last_callback_time_system = None
         self.callback_dt_history = deque(maxlen=100)
         self.callback_count = 0
         self.messages_received = 0
+        self.process_decimation = 10 # Default to 10 for 500Hz/10 = 50Hz
+        self.callback_counter = 0
         
         # Configure QoS to match publisher and avoid buffering
         qos_profile = QoSProfile(
@@ -146,7 +148,7 @@ class WeightDetector(Node):
             qos_profile
         )
 
-        self.weight_set = [20, 50, 100, 200, 500]
+        self.weight_set = [0, 50, 100, 200, 500]
 
         self.mass_publisher = self.create_publisher(Int32, '/estimated_mass', 10)
         self.calibration_status_publisher = self.create_publisher(Bool, '/weight_detection/calibration_status', 10)
@@ -175,7 +177,7 @@ class WeightDetector(Node):
         self.active_joints = [1, 2]
         
         # Since callbacks are slow (1.5-3Hz), always use full system parameters
-        self.exp_amplitude_light = 4.2
+        self.exp_amplitude_light = 5.15
         self.exp_amplitude_heavy = 6.9
         self.decay_light = 5.75
         self.decay_heavy = 2.95
@@ -195,7 +197,9 @@ class WeightDetector(Node):
         self.mass_history = deque(maxlen=self.history_length)
         
         self.declare_parameter('active_joints', self.active_joints)
-        self.declare_parameter('enable_plotting', True)
+        self.declare_parameter('useSnapping', True)
+        self.use_snapping = self.get_parameter('useSnapping').value
+        self.declare_parameter('enable_plotting', False)
 
         # Only create plotting if enabled
         self.enable_plotting = self.get_parameter('enable_plotting').value
@@ -212,7 +216,7 @@ class WeightDetector(Node):
         
         self.get_logger().info('Weight detection module initialised - calibrating baseline...')
         self.get_logger().info(f'Active joints for mass estimation: {[j+1 for j in self.active_joints]}')
-        self.get_logger().info('Callback rate is slow (1.5-3Hz) - using full system calibration parameters')
+        # self.get_logger().info('Callback rate is slow (1.5-3Hz) - using full system calibration parameters')
     
     def setup_plotting(self):
         plt.ion()
@@ -254,7 +258,7 @@ class WeightDetector(Node):
             avg_rate = 1.0 / avg_dt if avg_dt > 0 else 0
             self.get_logger().info(
                 f"Diagnostics: {self.messages_received} messages received, "
-                f"callback rate: {avg_rate:.1f}Hz (expected: 350-500Hz from topic)"
+                f"callback rate: {avg_rate:.1f}Hz"
             )
             
             # This confirms the slow callback is the actual behavior
@@ -262,6 +266,7 @@ class WeightDetector(Node):
     
     def update_parameters(self):
         self.active_joints = self.get_parameter('active_joints').value
+        self.use_snapping = self.get_parameter('useSnapping').value
 
     def calibrate_baseline_callback(self, request, response):
         self.get_logger().info("Baseline recalibration requested - resetting baseline and Kalman filters...")
@@ -286,6 +291,12 @@ class WeightDetector(Node):
         return response
 
     def joint_state_callback(self, msg):
+        # Decimate input frequency: only process every Nth message if plotting is disabled
+        if not self.enable_plotting:
+            self.callback_counter += 1
+            if self.callback_counter % self.process_decimation != 0:
+                return
+
         # Track timing with system time for accuracy
         current_time_system = time.time()
         
@@ -341,17 +352,14 @@ class WeightDetector(Node):
             self.estimate_mass_physics(filtered_torques)
     
     def snap_to_weight_set(self, estimated_mass_grams):
-        weight_array = np.array(self.weight_set)
-        differences = np.abs(weight_array - estimated_mass_grams)
-        closest_idx = np.argmin(differences)
-        closest_weight = self.weight_set[closest_idx]
-
-        if estimated_mass_grams > 30 and closest_weight == 20:
-            closest_weight = 50
-        elif estimated_mass_grams < 12 and closest_weight == 20:
-            closest_weight = 0
-
-        return closest_weight
+        if estimated_mass_grams <= 17.5:
+            return 0
+        elif estimated_mass_grams <= 135:
+            return 100
+        elif estimated_mass_grams <= 325:
+            return 200
+        else:
+            return 500
 
     def estimate_mass_physics(self, current_torques):
         if self.baseline_torques is None or self.current_joint_angles is None:
@@ -373,13 +381,17 @@ class WeightDetector(Node):
             self.calibration_factor = self.exp_amplitude_heavy * np.exp(-self.decay_heavy * raw_mass)
 
         self.estimated_mass_grams = raw_mass * self.calibration_factor * 1000
-        self.estimated_mass_grams = round(self.estimated_mass_grams / 5) * 5
 
         self.mass_history.append(self.estimated_mass_grams)
+        
+        output_mass = 0
+        if self.use_snapping:
+            output_mass = self.snap_to_weight_set(self.estimated_mass_grams)
+        else:
+            output_mass = int(round(self.estimated_mass_grams))
 
-        snapped_mass_grams = self.snap_to_weight_set(self.estimated_mass_grams)
         mass_msg = Int32()
-        mass_msg.data = int(snapped_mass_grams)
+        mass_msg.data = output_mass
         self.mass_publisher.publish(mass_msg)
     
     def update_plots(self):
