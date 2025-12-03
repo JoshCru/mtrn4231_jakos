@@ -44,6 +44,10 @@ The robot continuously monitors its environment, detects objects, picks them, we
 
 [![**Watch the full sorting cycle demonstration**](https://img.youtube.com/vi/PpM6lK07q4s/0.jpg)](https://www.youtube.com/watch?v=PpM6lK07q4s)
 
+### Visualisation Preview
+
+![Example of our Visualisation](visualisation.gif)
+
 ---
 
 ## System Architecture
