@@ -292,9 +292,9 @@ class YOLObjectDetect(Node):
         hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
 
         # Two ranges for red (wraps around 180)
-        lower_red1 = np.array([0, 80, 50])
+        lower_red1 = np.array([0, 50, 50]) # Adjusted S/V range
         upper_red1 = np.array([10, 255, 255])
-        lower_red2 = np.array([160, 80, 50])
+        lower_red2 = np.array([160, 50, 50])
         upper_red2 = np.array([180, 255, 255])
 
         mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
@@ -327,15 +327,15 @@ class YOLObjectDetect(Node):
         Map a measured height (in meters) to a numeric weight in grams.
         >>> YOU MUST TUNE THESE THRESHOLDS BASED ON YOUR ACTUAL WEIGHTS. <<<
         """
-        if height_m > 0.040:
+        if height_m > 0.040:    # > 4.0 cm
             return 500
-        elif height_m > 0.030:
+        elif height_m > 0.030:  # 3–4 cm
             return 200
-        elif height_m > 0.025:
+        elif height_m > 0.025:  # 2.5–3 cm
             return 100
-        elif height_m > 0.020:
+        elif height_m > 0.020:  # 2–2.5 cm
             return 50
-        elif height_m > 0.015:
+        elif height_m > 0.015:  # 2–1.5 cm
             return 20
         else:
             return 10
