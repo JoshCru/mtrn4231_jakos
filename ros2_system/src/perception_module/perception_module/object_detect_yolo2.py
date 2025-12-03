@@ -13,12 +13,9 @@ from rclpy.node import Node
 from rclpy.time import Time
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import String
-from geometry_msgs.msg import TransformStamped
 from geometry_msgs.msg import PointStamped
-from tf2_geometry_msgs import do_transform_point
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
-from tf2_ros import TransformException
 
 
 class YOLObjectDetect(Node):
@@ -28,7 +25,7 @@ class YOLObjectDetect(Node):
 
         # ---------- Parameters ----------
         default_weights = os.path.expanduser(
-            '/home/mtrn/Downloads/mtrn4231_jakos/ros2_system/src/perception_module/best.pt'
+            '/home/mtrn/mtrn4231_jakos/ros2_system/src/perception_module/best.pt'
         )
         self.declare_parameter('yolo_weights', default_weights)
         self.declare_parameter('conf_thres', 0.25)
@@ -61,15 +58,18 @@ class YOLObjectDetect(Node):
         # will store marker_id -> (x_min, y_min, x_max, y_max) in image pixels
         self.marker_regions = {}
 
+        # homography image -> UR base (XY in mm)
+        self.H = None
+
         # ---------- Marker -> UR base coordinates (mm) ----------
-        # TODO: replace placeholders with real UR pendant measurements
+        # These are your measured coordinates from the UR pendant
         self.marker_to_ur_mm = {
-            1: np.array([-795.0, 56.0, 43.0]),  # pick zone 1
-            2: np.array([-415.0, 56.0, 43.0]),  # pick zone 2
-            3: np.array([-795.0, -252, 43.0]),  # pick zone 3
-            4: np.array([-415.0, -252, 43.0]),  # pick zone 4
-            5: np.array([-795.0, -391.0, 43.0]),  # sorting bin A
-            6: np.array([-415.0, -252.0, 43.0]),  # sorting bin B
+            1: np.array([-795.0,   56.0, 43.0]),   # pick zone 1
+            2: np.array([-415.0,   56.0, 43.0]),   # pick zone 2
+            3: np.array([-795.0, -252.0, 43.0]),   # pick zone 3
+            4: np.array([-415.0, -252.0, 43.0]),   # pick zone 4
+            5: np.array([-795.0, -391.0, 43.0]),   # sorting bin A
+            6: np.array([-415.0, -252.0, 43.0]),   # sorting bin B (check this)
         }
 
         # ---------- Depth camera subscriptions ----------
@@ -103,7 +103,7 @@ class YOLObjectDetect(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # ---------- Publishers for other nodes ----------
-        # 3D position in base_link (meters) – from ArUco zone centres (mm -> m)
+        # 3D position in base_link (meters)
         self.coord_pub = self.create_publisher(
             PointStamped,
             'object_coords',
@@ -168,23 +168,7 @@ class YOLObjectDetect(Node):
         except Exception as e:
             self.get_logger().error(f"Error in arm_depth_callback: {str(e)}")
 
-    def get_view_ray(self, u, v):
-        fx = self.intrinsics.fx
-        fy = self.intrinsics.fy
-        cx = self.intrinsics.ppx
-        cy = self.intrinsics.ppy
-
-        # ray in optical frame (unnormalized)
-        x = (u - cx) / fx
-        y = (v - cy) / fy
-        z = 1.0
-
-        # normalize
-        ray = np.array([x, y, z], dtype=float)
-        ray = ray / np.linalg.norm(ray)
-        return ray
-
-    # ----------------- Pixel -> 3D in camera frame -----------------
+    # ----------------- Pixel -> 3D in camera frame (not used for UR mapping here) -----------------
     def pixel_2_global(self, u: int, v: int):
         if self.depth_image is None or self.intrinsics is None:
             return None
@@ -285,7 +269,6 @@ class YOLObjectDetect(Node):
         # return height + the two sampling pixels
         return height_m, (u_center, v_top), (u_center, v_table)
 
-
     def refine_center_with_circle(self, img, x1, y1, x2, y2):
         """
         Refine the object centre by detecting the red circular top inside the YOLO bbox.
@@ -357,6 +340,41 @@ class YOLObjectDetect(Node):
         else:
             return 10
 
+    # ----------------- Helper: build homography from ArUco markers -----------------
+    def update_homography_from_markers(self):
+        """
+        Uses centres of detected ArUco markers (image) and their known UR coordinates (world)
+        to compute a homography H that maps image (u, v) -> UR XY in mm.
+        """
+        img_pts = []
+        world_pts = []
+
+        for marker_id, (mx1, my1, mx2, my2) in self.marker_regions.items():
+            if marker_id not in self.marker_to_ur_mm:
+                continue
+
+            # image centre of the marker
+            u_m = 0.5 * (mx1 + mx2)
+            v_m = 0.5 * (my1 + my2)
+
+            # world coordinates in mm (XY plane)
+            Xw = self.marker_to_ur_mm[marker_id][0]
+            Yw = self.marker_to_ur_mm[marker_id][1]
+
+            img_pts.append([u_m, v_m])
+            world_pts.append([Xw, Yw])
+
+        if len(img_pts) >= 4:
+            img_pts = np.array(img_pts, dtype=np.float32)
+            world_pts = np.array(world_pts, dtype=np.float32)
+
+            H, _ = cv2.findHomography(img_pts, world_pts)
+            if H is not None:
+                self.H = H
+                self.get_logger().debug(f"Updated homography H:\n{H}")
+        else:
+            self.H = None
+
     # ----------------- Main routine: YOLO + depth + ArUco -----------------
     def routine_callback(self):
         if self.cv_image is None or self.depth_image is None or self.intrinsics is None:
@@ -393,6 +411,11 @@ class YOLObjectDetect(Node):
                     1,
                 )
 
+            # try updating homography from this frame's markers
+            self.update_homography_from_markers()
+        else:
+            self.H = None
+
         # --- YOLO detection ---
         try:
             results = self.model.predict(img, conf=self.conf_thres, verbose=False)[0]
@@ -410,6 +433,9 @@ class YOLObjectDetect(Node):
                     cv2.destroyAllWindows()
             return
 
+        # Default Z in mm – assume table plane from your marker Z values
+        default_z_mm = 43.0
+
         for i, box in enumerate(results.boxes):
             cls_id = int(box.cls[0])
             cls_name = self.names.get(cls_id, str(cls_id))
@@ -424,75 +450,90 @@ class YOLObjectDetect(Node):
             u, v, r_px = self.refine_center_with_circle(img, x1, y1, x2, y2)
 
             # ---- Estimate cylinder height & weight from depth ----
-        height_result = self.estimate_height_m(x1, y1, x2, y2)
-        weight_g = None
-        if height_result is not None:
-               height_m, top_px, table_px = height_result
-               weight_g = self.estimate_weight_from_height(height_m)
-               self.get_logger().info(
-                   f"Estimated height: {height_m*1000.0:.1f} mm, "
-                   f"estimated weight: {weight_g} g"
-               )
+            height_result = self.estimate_height_m(x1, y1, x2, y2)
+            weight_g = None
+            if height_result is not None:
+                height_m, top_px, table_px = height_result
+                weight_g = self.estimate_weight_from_height(height_m)
+                self.get_logger().info(
+                    f"Estimated height: {height_m*1000.0:.1f} mm, "
+                    f"estimated weight: {weight_g} g"
+                )
 
+            # ---- Map YOLO centre (u, v) to UR base XY using homography ----
+            Xw_mm = Yw_mm = None
 
-            # ---- ArUco-based zone detection (discrete UR target) ----
-        zone_marker = None
-        for marker_id, (mx1, my1, mx2, my2) in self.marker_regions.items():
-                if mx1 <= u <= mx2 and my1 <= v <= my2:
-                    zone_marker = marker_id
-                    break
+            if self.H is not None:
+                pt_img = np.array([[u], [v], [1.0]], dtype=np.float32)
+                pt_world = self.H @ pt_img
+                W = pt_world[2, 0]
 
-        if zone_marker is not None:
-                self.get_logger().info(f"Object appears over marker {zone_marker}")
+                if abs(W) > 1e-6:
+                    Xw_mm = pt_world[0, 0] / W
+                    Yw_mm = pt_world[1, 0] / W
+                else:
+                    self.get_logger().warn("Homography mapping produced near-zero W")
+            else:
+                # Fallback: zone-based discrete mapping if homography not available
+                zone_marker = None
+                for marker_id, (mx1, my1, mx2, my2) in self.marker_regions.items():
+                    if mx1 <= u <= mx2 and my1 <= v <= my2:
+                        zone_marker = marker_id
+                        break
 
-                if zone_marker in self.marker_to_ur_mm:
+                if zone_marker is not None and zone_marker in self.marker_to_ur_mm:
                     ur_xyz_mm = self.marker_to_ur_mm[zone_marker]
+                    Xw_mm = ur_xyz_mm[0]
+                    Yw_mm = ur_xyz_mm[1]
                     self.get_logger().info(
-                        f"Marker-based UR target (mm) for marker {zone_marker}: "
-                        f"X={ur_xyz_mm[0]:.1f}, Y={ur_xyz_mm[1]:.1f}, Z={ur_xyz_mm[2]:.1f}"
+                        f"[Fallback] Using zone marker {zone_marker} coords: "
+                        f"X={Xw_mm:.1f}, Y={Yw_mm:.1f}, Z={ur_xyz_mm[2]:.1f}"
                     )
 
-                    # --- Publish PointStamped in meters (base_link) ---
-                    pt_msg = PointStamped()
-                    pt_msg.header.stamp = self.get_clock().now().to_msg()
-                    pt_msg.header.frame_id = "base_link"  # treat as UR base
-                    pt_msg.point.x = float(ur_xyz_mm[0] / 1000.0)
-                    pt_msg.point.y = float(ur_xyz_mm[1] / 1000.0)
-                    pt_msg.point.z = float(ur_xyz_mm[2] / 1000.0)
-                    self.coord_pub.publish(pt_msg)
+            # If we got some world coordinates, publish them
+            if Xw_mm is not None and Yw_mm is not None:
+                Zw_mm = default_z_mm  # could be refined later using depth if needed
 
-                    # --- Publish combined info: x_mm,y_mm,z_mm,weight_g ---
-                    info = String()
-                    if weight_g is not None:
-                        info.data = (
-                            f"{ur_xyz_mm[0]:.1f},"
-                            f"{ur_xyz_mm[1]:.1f},"
-                            f"{ur_xyz_mm[2]:.1f},"
-                            f"{weight_g}"
-                        )
-                    else:
-                        # -1 = unknown weight
-                        info.data = (
-                            f"{ur_xyz_mm[0]:.1f},"
-                            f"{ur_xyz_mm[1]:.1f},"
-                            f"{ur_xyz_mm[2]:.1f},-1"
-                        )
-                    self.info_pub.publish(info)
+                # --- Publish PointStamped in meters (base_link) ---
+                pt_msg = PointStamped()
+                pt_msg.header.stamp = self.get_clock().now().to_msg()
+                pt_msg.header.frame_id = "base_link"  # UR base
+                pt_msg.point.x = float(Xw_mm / 1000.0)
+                pt_msg.point.y = float(Yw_mm / 1000.0)
+                pt_msg.point.z = float(Zw_mm / 1000.0)
+                self.coord_pub.publish(pt_msg)
 
-        else:
-                self.get_logger().warn("Object not over any known ArUco marker zone")
+                # --- Publish combined info: x_mm,y_mm,z_mm,weight_g ---
+                info = String()
+                if weight_g is not None:
+                    info.data = (
+                        f"{Xw_mm:.1f},"
+                        f"{Yw_mm:.1f},"
+                        f"{Zw_mm:.1f},"
+                        f"{weight_g}"
+                    )
+                else:
+                    # -1 = unknown weight
+                    info.data = (
+                        f"{Xw_mm:.1f},"
+                        f"{Yw_mm:.1f},"
+                        f"{Zw_mm:.1f},-1"
+                    )
+                self.info_pub.publish(info)
+            else:
+                self.get_logger().warn("Could not compute world coordinates for this detection")
 
             # ---- Draw BLUE bounding box + centre dot ----
-        cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)),
+            cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)),
                           (255, 0, 0), 1)  # Bounding Box
-        cv2.circle(img, (u, v), 4, (255, 0, 0), -1)  # Centroid Circle
+            cv2.circle(img, (u, v), 4, (255, 0, 0), -1)  # Centroid Circle
 
-        if weight_g is not None:
+            if weight_g is not None:
                 label_text = f"{cls_name} {conf:.2f} {weight_g}g"
-        else:
+            else:
                 label_text = f"{cls_name} {conf:.2f}"
 
-        cv2.putText(
+            cv2.putText(
                 img,
                 label_text,
                 (int(x1), max(0, int(y1) - 5)),
@@ -533,7 +574,6 @@ class YOLObjectDetect(Node):
                 cv2.destroyAllWindows()
 
 
-
 def main():
     rclpy.init()
     node = YOLObjectDetect()
@@ -547,10 +587,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-#def callback(msg: String):
-    #x_mm, y_mm, z_mm, weight_g = msg.data.split(',')
-    #x_mm = float(x_mm)
-    #y_mm = float(y_mm)
-    #z_mm = float(z_mm)
-    #weight_g = int(weight_g)
