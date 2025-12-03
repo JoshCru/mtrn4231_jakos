@@ -216,7 +216,7 @@ class WeightDetector(Node):
         
         self.get_logger().info('Weight detection module initialised - calibrating baseline...')
         self.get_logger().info(f'Active joints for mass estimation: {[j+1 for j in self.active_joints]}')
-        self.get_logger().info('Callback rate is slow (1.5-3Hz) - using full system calibration parameters')
+        # self.get_logger().info('Callback rate is slow (1.5-3Hz) - using full system calibration parameters')
     
     def setup_plotting(self):
         plt.ion()
@@ -258,7 +258,7 @@ class WeightDetector(Node):
             avg_rate = 1.0 / avg_dt if avg_dt > 0 else 0
             self.get_logger().info(
                 f"Diagnostics: {self.messages_received} messages received, "
-                f"callback rate: {avg_rate:.1f}Hz (expected: 350-500Hz from topic)"
+                f"callback rate: {avg_rate:.1f}Hz"
             )
             
             # This confirms the slow callback is the actual behavior
