@@ -237,7 +237,7 @@ The perception system provides object poses in the robot's coordinate frame, ena
 
 ### Custom End-Effector
 
-![Gripper image](Gripper_Render.png "Rendered Image of Gripper Model")
+![Gripper image](Gripper_Rendered.png "Rendered Image of Gripper Model")
 
 **Gripper design integrates:**
 
