@@ -255,17 +255,22 @@ The perception system provides object poses in the robot's coordinate frame, ena
 - **Max payload**: 500g
 
 #### Control Overview
-- Arduino communicates via serial at 115200 baud
-- Command format: `G<angle>` (e.g. `G90` for 90 degrees)
-- Response format: `W<weight>` (e.g. `W150.5` for 150.5 grams)
-- Gripper controller node handles lifecycle management (configure → activate)
+- Arduino communicates via serial at 9600 baud rate running program: ([/arduino/servo.ino](/arduino/servo.ino)).
+- **Available Commands:**
+
+  | Command | Action | Example |
+  | :---: | :--- | :--- |
+  | `F` | Initialise Program | - |
+  | `E <weight>` | Edit Weight | `E 500` (sets 500g) |
+  | `W` | Open Gripper | - |
+  | `S` | Close Gripper | - |
+
+- Handled by the [**Gripper Controller Node**](/ros2_system/src/control_module/src/gripper_controller_node.cpp) (configure / activate)
 
 #### Integration
 - Serial communication handled by `gripper_controller_node`
 - Weight measurements fed into sorting decision logic
 - Compliant grasping ensures reliable pickup of varied objects
-
-See [GRIPPER_INTEGRATION.md](GRIPPER_INTEGRATION.md) for detailed assembly and wiring information.
 
 ### Weight Detection
 
@@ -375,9 +380,18 @@ We recommend changing the Buffer size (top left, under "Streaming") to **90 seco
 
 **Alternative: Python Node**
 
-**WARNING**: Only intended for visualisation of torque filtering on all 6 robot joints as this uses an outdated estimator.
+As a backup, a python implementation is also provided, which is almost identical to the C++ node, except that it uses an exponential gain factor instead of polynomial.
+
+$ae^{-b \,\cdot \,\text{mass}}$
+
+**WARNING**: Only intended for visualisation of torque filtering on all 6 robot joints as this uses an inferior estimator.
+
 ```bash
 ros2 run weight_detection_module weight_detector_py.py
+
+ros2 run weight_detection_module weight_detector --ros-args -p useSnapping:=false
+
+ros2 run weight_detection_module weight_detector --ros-args -p enable_plotting:=false
 ```
 
 #### Limitations and Assumptions
@@ -521,15 +535,14 @@ sudo apt install -y \
 
 ```bash
 # Clone the repository
-cd ~/Documents
-git clone <repository_url> mtrn4231_jakos
+git clone https://github.com/JoshCru/mtrn4231_jakos.git
 cd mtrn4231_jakos
 
 # Navigate to ROS2 workspace
 cd ros2_system
 
-# Install Python dependencies (if any)
-pip3 install -r requirements.txt  # if present
+# Install Python dependencies
+pip3 install -r requirements.txt
 
 # Build all packages
 colcon build --symlink-install
@@ -587,36 +600,43 @@ source install/setup.bash
    - Verify freedrive mode is disabled
    - Robot should be in remote control mode
 
-#### Arduino Gripper Setup
+#### Teensy Gripper Setup
+
+1. **Wiring Setup**
+  ![Gripper wiring image](GripperWiring.png "Gripper Wiring Guide")
+   *Generated using Gemini Nano Banana*
 
 1. **Upload Gripper Control Sketch**
    ```bash
    # Open Arduino IDE
-   # Load sketch from arduino/gripper_controller/
+   # Load sketch from arduino/servo.ino/
    # Upload to Arduino board
    ```
 
 2. **Serial Connection**
-   - Connect Arduino via USB
+   - Connect Teensy via USB
    - Verify device appears as `/dev/ttyACM0`
-   - Add user to dialout group:
-     ```bash
-     sudo usermod -a -G dialout $USER
-     # Log out and back in for changes to take effect
-     ```
+   - If not, unplug and replug USB until it appears
 
 3. **Gripper Calibration**
-   - Align servo marker to 'o' (open) position
+   - Align servo marker to 'o' (open) position (marked on gripper)
+
+4. **Test Gripper**
    - Test gripper motion:
-     ```bash
-     # In Arduino serial monitor
-     W  # Open gripper
-     S  # Close gripper
-     ```
+```bash
+ros2 run util_arduino_serial util_arduino_serial
+# In another terminal
+rqt
+# create message publisher of "/arduinoCommand"
+# Send:
+F  # Start
+W  # Open gripper
+S  # Close gripper
+ ```
 
-#### RGBD Camera Setup (for Real Mode)
+#### RGB-D Camera Setup (for Real Mode)
 
-1. **Install RealSense SDK** (if using Intel RealSense)
+1. **Install RealSense**
    ```bash
    sudo apt install ros-humble-realsense2-camera
    ```
@@ -826,19 +846,18 @@ ros2 launch full_system.launch.py \
 
 The launch file orchestrates a timed startup sequence:
 
-1. **[0s]** FastDDS profile creation
-2. **[1s]** UR5e driver starts (simulation or real)
-3. **[10s]** MoveIt2 motion planning loads
-4. **[22s]** Robot moves to HOME position
-5. **[27s]** Safety boundary visualiser starts
-6. **[29s]** Perception starts (simulated or real)
-7. **[31s]** Weight detection starts (if enabled)
-8. **[33s]** Gripper controller starts
-9. **[35s]** Gripper lifecycle: configure
-10. **[37s]** Gripper lifecycle: activate
-11. **[41s]** Cartesian motion controller starts
-12. **[44s]** Sorting brain node starts
-13. **[46s]** System ready message
+1. **[1s]** UR5e driver starts (simulation or real)
+2. **[10s]** MoveIt2 motion planning loads
+3. **[22s]** Robot moves to HOME position
+4. **[27s]** Safety boundary visualiser starts
+5. **[29s]** Perception starts (simulated or real)
+6. **[31s]** Weight detection starts (if enabled)
+7. **[33s]** Gripper controller starts
+8. **[35s]** Gripper lifecycle: configure
+9.  **[37s]** Gripper lifecycle: activate
+10. **[41s]** Cartesian motion controller starts
+11. **[44s]** Sorting brain node starts
+12. **[46s]** System ready message
 14. **[48s]** Autorun triggers (if enabled)
 
 ### Example Output
@@ -1216,7 +1235,6 @@ mtrn4231_jakos/
 - **ROS2 Humble**: Robot Operating System 2 ([https://docs.ros.org/en/humble/](https://docs.ros.org/en/humble/))
 - **MoveIt2**: Motion planning framework ([https://moveit.ros.org/](https://moveit.ros.org/))
 - **Universal Robots ROS2 Driver**: UR5e interface ([https://github.com/UniversalRobots/Universal_Robots_ROS2_Driver](https://github.com/UniversalRobots/Universal_Robots_ROS2_Driver))
-- **FastDDS**: DDS implementation for ROS2 ([https://fast-dds.docs.eprosima.com/](https://fast-dds.docs.eprosima.com/))
 - **Eigen**: Linear algebra library ([https://eigen.tuxfamily.org/](https://eigen.tuxfamily.org/))
 - **OpenCV**: Computer vision library ([https://opencv.org/](https://opencv.org/))
 - **PCL**: Point Cloud Library ([https://pointclouds.org/](https://pointclouds.org/))
@@ -1227,13 +1245,11 @@ mtrn4231_jakos/
 - Universal Robots UR5e User Manual
 - MoveIt2 Motion Planning Tutorial
 - ROS2 Lifecycle Node Design Pattern
-- Kalman Filtering for Sensor Fusion
 
 ### Acknowledgements
 
 - **MTRN4231 Course Staff**: For guidance and support throughout the project
-- **Demonstrators**: For assistance with hardware setup and debugging
-- **Universal Robots**: For comprehensive documentation and ROS2 driver support
+- **Demonstrators**: For assistance with hardware setup and debugging (especially **Alex**)
 - **ROS2 Community**: For open-source tools and libraries
 
 ### Prior Work
@@ -1251,6 +1267,6 @@ MIT License - See LICENSE file for details.
 
 ---
 
-**MTRN4231 - Advanced Robotics Project**
+**MTRN4231 - Robotics Project**
 University of New South Wales
-2024
+2025
