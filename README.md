@@ -46,6 +46,8 @@ The robot continuously monitors its environment, detects objects, picks them, we
 
 ### Visualisation Preview
 
+Example of visualisation in pick and place operation (_don't forget to press play on the GIF!_)
+
 ![Example of our Visualisation](visualisation.gif)
 
 ---
