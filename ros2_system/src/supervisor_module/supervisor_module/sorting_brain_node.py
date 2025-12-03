@@ -209,7 +209,7 @@ class SortingBrainNode(Node):
         # Weight estimation from Asad's weight_detection_module
         self.weight_estimate_sub = self.create_subscription(
             Int32,
-            '/recognition/estimated_mass',
+            '/estimated_mass',
             self.weight_estimate_callback,
             10,
             callback_group=self.callback_group
