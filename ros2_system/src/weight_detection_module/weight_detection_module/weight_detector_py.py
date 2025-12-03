@@ -175,7 +175,7 @@ class WeightDetector(Node):
         self.active_joints = [1, 2]
         
         # Since callbacks are slow (1.5-3Hz), always use full system parameters
-        self.exp_amplitude_light = 5.15
+        self.exp_amplitude_light = 4.2
         self.exp_amplitude_heavy = 6.9
         self.decay_light = 5.75
         self.decay_heavy = 2.95

@@ -28,7 +28,7 @@ class YOLObjectDetect(Node):
 
         # ---------- Parameters ----------
         default_weights = os.path.expanduser(
-            '/home/mtrn/mtrn4231_jakos/ros2_system/src/perception_module/best.pt'
+            '/home/mtrn/Downloads/mtrn4231_jakos/ros2_system/src/perception_module/best.pt'
         )
         self.declare_parameter('yolo_weights', default_weights)
         self.declare_parameter('conf_thres', 0.25)
@@ -424,9 +424,9 @@ class YOLObjectDetect(Node):
             u, v, r_px = self.refine_center_with_circle(img, x1, y1, x2, y2)
 
             # ---- Estimate cylinder height & weight from depth ----
-           height_result = self.estimate_height_m(x1, y1, x2, y2)
-           weight_g = None
-           if height_result is not None:
+        height_result = self.estimate_height_m(x1, y1, x2, y2)
+        weight_g = None
+        if height_result is not None:
                height_m, top_px, table_px = height_result
                weight_g = self.estimate_weight_from_height(height_m)
                self.get_logger().info(
@@ -436,13 +436,13 @@ class YOLObjectDetect(Node):
 
 
             # ---- ArUco-based zone detection (discrete UR target) ----
-            zone_marker = None
-            for marker_id, (mx1, my1, mx2, my2) in self.marker_regions.items():
+        zone_marker = None
+        for marker_id, (mx1, my1, mx2, my2) in self.marker_regions.items():
                 if mx1 <= u <= mx2 and my1 <= v <= my2:
                     zone_marker = marker_id
                     break
 
-            if zone_marker is not None:
+        if zone_marker is not None:
                 self.get_logger().info(f"Object appears over marker {zone_marker}")
 
                 if zone_marker in self.marker_to_ur_mm:
@@ -479,20 +479,20 @@ class YOLObjectDetect(Node):
                         )
                     self.info_pub.publish(info)
 
-            else:
+        else:
                 self.get_logger().warn("Object not over any known ArUco marker zone")
 
             # ---- Draw BLUE bounding box + centre dot ----
-            cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)),
+        cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)),
                           (255, 0, 0), 1)  # Bounding Box
-            cv2.circle(img, (u, v), 4, (255, 0, 0), -1)  # Centroid Circle
+        cv2.circle(img, (u, v), 4, (255, 0, 0), -1)  # Centroid Circle
 
-            if weight_g is not None:
+        if weight_g is not None:
                 label_text = f"{cls_name} {conf:.2f} {weight_g}g"
-            else:
+        else:
                 label_text = f"{cls_name} {conf:.2f}"
 
-            cv2.putText(
+        cv2.putText(
                 img,
                 label_text,
                 (int(x1), max(0, int(y1) - 5)),

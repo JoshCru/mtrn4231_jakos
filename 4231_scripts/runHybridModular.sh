@@ -109,12 +109,12 @@ ros2 run motion_control_module go_home 5.0
 echo "Robot at home position"
 sleep 2
 
-# # 4. Safety Visualizer
-# echo "[4/8] Starting Safety Visualizer..."
-# wait_for_enter
-# python3 "${ROS2_WS}/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_collision.py" &
-# SAFETY_PID=$!
-# sleep 2
+# 4. Safety Visualizer
+echo "[4/8] Starting Safety Visualizer..."
+wait_for_enter
+python3 "${ROS2_WS}/install/motion_control_module/share/motion_control_module/scripts/safety_boundary_collision.py" &
+SAFETY_PID=$!
+sleep 2
 
 # 5. Simulated Perception
 echo "[5/8] Starting Simulated Perception..."

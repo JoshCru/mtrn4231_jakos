@@ -490,7 +490,7 @@ class SortingBrainNode(Node):
             msg = 'Step: Opening gripper (waiting 5s)...'
             self.get_logger().info(msg)
             self.publish_status(msg)
-            if not self.gripper_control('W', wait_time_sec=5.0):
+            if not self.gripper_control('W', wait_time_sec=10.0):
                 self.get_logger().error('Failed to open gripper')
                 self.transition_state(SortingState.ERROR)
                 return
