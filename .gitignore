@@ -3,3 +3,6 @@
 **/log/
 
 .vscode/
+
+rosbags2/NewBag200
+rosbags2/NewBag500
