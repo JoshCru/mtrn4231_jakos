@@ -231,16 +231,6 @@ class PositionCheckNode(Node):
             center_y = (first_obj.y_min + first_obj.y_max) / 2.0
             self.move_to(center_x, center_y, self.z_home)
 
-        # Close gripper
-        self.get_logger().info('Closing gripper...')
-        self.close_gripper()
-
-        # Wait for gripper to fully complete closing and settling
-        # The gripper service uses a timed wait (default 5s), but the Arduino
-        # may take longer to complete the movement and stabilize
-        gripper_settle_time = 12.0
-        self.get_logger().info(f'Waiting {gripper_settle_time}s for gripper to settle...')
-        time.sleep(gripper_settle_time)
 
         # Signal completion so sorting system knows it's safe to start
         done_msg = Bool()
