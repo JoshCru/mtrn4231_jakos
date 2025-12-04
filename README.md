@@ -411,6 +411,8 @@ ros2 run perception_module object_detect_yolo \
 
 ![Gripper image](Gripper_Rendered.png "Rendered Image of Gripper Model")
 
+_Added reflections to CAD Model using Gemini Nano Banana_
+
 **Gripper design integrates:**
 
 #### Hardware Components
