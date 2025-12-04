@@ -94,7 +94,7 @@ class SimulatedPerceptionNode(Node):
         # Publisher for weight estimates (when object is picked)
         self.weight_pub = self.create_publisher(
             Int32,
-            '/recognition/estimated_mass',
+            '/estimated_mass',
             10
         )
 
