@@ -546,7 +546,7 @@ If needed, test scripts are available in the format `test_{ROS_NODE_LANGUAGE}_{M
 
 The test processes data from pre-recorded ROS bags found in the [rosbags2 directory](rosbags2/).
 
-**Visualisation:**
+**Visualisation & Results:**
 
 Use **PlotJuggler** to monitor the estimated mass topic in real-time:
 
@@ -557,11 +557,19 @@ cd ./ros2_system  # Ensure you are in the 'ros2_system' directory
 
 Click **'Yes'** in the "Start Streaming" popup, then **'Ok'**. The visualisation should appear.
 
-We recommend changing the Buffer size (top left, under "Streaming") to **90 seconds**.
+We recommend changing the Buffer size (top left, under "Streaming") to **70 seconds**.
 
 **Expected output**: A step plot showing mass estimates. With snapping enabled, you'll see discrete jumps between weight classes. With snapping disabled, you'll see smoother transitions.
 
+**Snapping Mode Example**:
+
 ![Demo Discrete Plot](ros2_system/demo_discrete_plot.png)
+
+**Combined Snapping and Non-Snapping Mode Example**:
+
+
+![Demo Combined Continuous/Discrete Plot](ros2_system/continuous_discrete_combined_plot.png)
+
 
 **Alternative: Python Node**
 
