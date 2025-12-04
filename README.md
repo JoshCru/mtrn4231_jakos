@@ -234,9 +234,9 @@ The explicit graph can be found in [ROS2 Node and Topics Graph (rqt)](#ros2-node
 This package performs real-time object detection of **red cylindrical weights** using YOLOv8, extracts precise **3D coordinates** using Intel RealSense depth, transforms them into the **UR5e base frame**, and publishes both coordinates and weight estimation to downstream robot modules.
 
 
-## 1. System Overview
+### System Overview
 
-### Processing Pipeline
+#### Processing Pipeline
 1. RealSense D435 streams RGB + aligned depth.
 2. YOLOv8 detects red cylindrical weights.
 3. Circle-refinement detects the red top knob for more accurate centre pixel.
@@ -250,16 +250,16 @@ This package performs real-time object detection of **red cylindrical weights** 
    - Top/table sampling points for height estimation
 
 
-## 2. ROS2 Topics
+### ROS2 Topics
 
-### Subscribed Topics
+#### Subscribed Topics
 | Topic | Type | Description |
 |-------|------|-------------|
 | `/camera/camera/color/image_raw` | `sensor_msgs/Image` | RGB frame |
 | `/camera/camera/aligned_depth_to_color/image_raw` | `sensor_msgs/Image` | Depth (aligned) |
 | `/camera/camera/aligned_depth_to_color/camera_info` | `sensor_msgs/CameraInfo` | Intrinsics |
 
-### Published Topics
+#### Published Topics
 | Topic          | Type                      | Description |
 |----------------|---------------------------|-------------|
 | `object_coords`| `geometry_msgs/PointStamped` | 3D position in `base_link` (m) |
@@ -276,10 +276,9 @@ For example:
 210.5,-145.2,85.0,200
 ```
 
+### Calculations & Coordinate Transforms
 
-## 3. Calculations & Coordinate Transforms
-
-### 3.1 Pixel → Depth → 3D (Camera Frame)
+#### Pixel → Depth → 3D (Camera Frame)
 
 Depth patch median (smoothing):
 ```python
@@ -300,7 +299,7 @@ Yc = -Xo
 Zc = -Yo
 ```
 
-### 3.2 Camera Frame → UR5e Base Frame
+#### Camera Frame → UR5e Base Frame
 Static TF:
 
 ```python
@@ -316,7 +315,7 @@ pt_base = do_transform_point(pt_cam, tf)
 Coordinates in base_link (meters) are published.
 
 
-## 4. Weight Estimation Logic
+### Weight Estimation Logic
 Object height is computed from depth:
 
 ```ini
@@ -336,7 +335,7 @@ Threshold → weight:
 These thresholds must be tuned using real measurements.
 
 
-## 5. Visual Outputs
+### Visual Outputs
 
 ![CV image](cv_terminal.png "3D coordinates & Yolov8 detected objects")
 
@@ -358,8 +357,8 @@ base_link
 ```
 
 
-## 6. How to Run
-### A) Recommended (Launch File)
+### How to Run
+#### A) Recommended (Launch File)
 ```nginx
 ros2 launch perception_module object_detect.launch.py
 ```
@@ -371,7 +370,7 @@ Your launch file automatically:
 
 - Launches YOLO node
 
-### B) Manual Run
+#### B) Manual Run
 1. Start RealSense:
 ```go
 ros2 launch realsense2_camera rs_launch.py align_depth.enable:=true enable_color:=true enable_depth:=true pointcloud.enable:=true
@@ -390,26 +389,6 @@ ros2 run perception_module object_detect_yolo \
   --ros-args \
   -p yolo_weights:=/home/mtrn/mtrn4231_jakos/ros2_system/src/perception_module/best.pt \
   -p target_class_name:=red_object
-```
-
-
-## 7. Package Structure
-```arduino
-perception_module/
-├── perception_module/
-│   ├── object_detect_yolo.py
-│   ├── object_detect_yolo2.py #with aruco markers
-├── launch/
-│   ├── object_detect.launch.py
-│   ├── object_detect2.launch.py #with aruco markers
-├── red_object.v3/        # YOLO dataset
-├── runs/detect/trainXX/  # Trained YOLO weights
-├── resource/
-├── test/
-├── best.pt               # YOLO trained weights
-├── package.xml
-├── setup.py
-└── README.md
 ```
 
 
@@ -575,7 +554,7 @@ We recommend changing the Buffer size (top left, under "Streaming") to **70 seco
 
 **Combined Snapping and Non-Snapping Mode Example**:
 
-Discrete (blue) and continuous (red) shown below, with continuous values rounded to nearest 5 grams.
+Discrete (blue) and continuous (red) shown below, with continuous values rounded to the nearest gram.
 
 ![Demo Combined Continuous/Discrete Plot](ros2_system/continuous_discrete_combine_plot.png)
 
@@ -1151,15 +1130,29 @@ The system was designed to achieve:
 ### Quantitative Results
 
 **Weight Detection Performance:**
+
+Combined Snapping and Non-Snapping Mode Example in 200 gram test case.
+
+Discrete (blue) and continuous (red) shown below, with continuous values rounded to the nearest gram.
+
+![Demo Combined Continuous/Discrete Plot](ros2_system/continuous_discrete_combine_plot.png)
 - Discrete snapping mode: 0g, 100g, 200g, 500g classification
-- Continuous mode: Polynomial calibration, ±5g accuracy
-- Calibration time: ~5.5 seconds
-- Measurement stabilisation: ~10 seconds after pickup
+- Continuous gain mode: Polynomial calibration to meet expected values
+- Measurement snapping stability: ~10 seconds after pickup
+- Low Tolerance: ±5g accuracy when given adequate settling time (~15-25 seconds, increasing from lighter to heavier weights)
 
 **Motion Planning:**
 - Average planning time: 1.2 seconds
 - Path execution time: 3-5 seconds per segment
 - Home → Pick → Weigh → Place → Home cycle: ~25 seconds
+
+**Computer Vision: YOLO:**
+
+![CV image](cv_terminal.png "3D coordinates & Yolov8 detected objects")
+
+- Consistency: Updating the mass bounding box (~1 second)
+- Low Confidence: Further training required (0.1 -> 0.4)
+- Position Accuracy: Estimates inaccuracy scales with distance from camera (2-20mm)
 
 ### System Robustness
 
@@ -1257,9 +1250,9 @@ The system was designed to achieve:
 - **Dynamic object tracking** for moving objects
 
 #### 2. Advanced Weight Estimation
+Predominantly requiring more time testing with data representative of application.
 - **Machine learning model** trained on torque-weight pairs
 - **Multi-pose averaging** for improved accuracy
-- **Temperature compensation** for torque drift
 - **Real-time calibration** without stopping operation
 
 #### 3. Intelligent Planning
