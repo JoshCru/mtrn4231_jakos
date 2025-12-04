@@ -329,6 +329,9 @@ These thresholds must be tuned using real measurements.
 
 
 ## 5. Visual Outputs
+
+![CV image](cv_terminal.png "3D Coordinates & Yolov8 detected Objects")
+
 OpenCV Windows:
 - YOLO Detection
   Bounding boxes, centre points, top-circle radius
