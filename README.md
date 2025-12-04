@@ -97,9 +97,9 @@ The system consists of 9 core nodes communicating through topics, services, and 
 │                                                           └─────► MoveIt2    │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
-The explicit graph can be found in [ROS2 Node / Topics Graph (rqt) ](####ROS2-Node-/-Topics-Graph-(rqt)).
+The explicit graph can be found in [ROS2 Node and Topics Graph (rqt)](#ros2-node-and-topics-graph-rqt).
 
-#### ROS2 Node / Topics Graph (rqt) 
+#### ROS2 Node and Topics Graph (rqt)
 
 ![Detailed ROS Node/Topics Graph from RQT](node_topic_diagram.png)
 
