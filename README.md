@@ -567,8 +567,9 @@ We recommend changing the Buffer size (top left, under "Streaming") to **70 seco
 
 **Combined Snapping and Non-Snapping Mode Example**:
 
+Discrete (blue) and continuous (red) shown below, with continuous values rounded to nearest 5 grams.
 
-![Demo Combined Continuous/Discrete Plot](ros2_system/continuous_discrete_combined_plot.png)
+![Demo Combined Continuous/Discrete Plot](ros2_system/continuous_discrete_combine_plot.png)
 
 
 **Alternative: Python Node**
