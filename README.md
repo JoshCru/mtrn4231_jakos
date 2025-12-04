@@ -46,7 +46,9 @@ The robot continuously monitors its environment, detects objects, picks them, we
 
 ### Visualisation Preview
 
-Example of visualisation in pick and place operation (_don't forget to press play on the GIF!_)
+Example of visualisation in pick and place operation. (_don't forget to press play on the GIF!_)
+
+The pause between loops is due to wait time for obtaining a mass estimate. 
 
 ![Example of our Visualisation](visualisation.gif)
 
@@ -59,20 +61,20 @@ Example of visualisation in pick and place operation (_don't forget to press pla
 The system consists of 9 core nodes communicating through topics, services, and actions:
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────────────────────┐
 │                              SORTING SYSTEM                                  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                               │
-│  [1] UR5e Driver ──────────► /joint_states ──────────► [7] Weight Detector  │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  [1] UR5e Driver ──────────► /joint_states ──────────► [7] Weight Detector   │
 │       (ur_robot_driver)       /joint_trajectory         (weight_detection)   │
-│            │                                                      │           │
-│            │                                                      ▼           │
+│            │                                                      │          │
+│            │                                                      ▼          │
 │            ▼                                             /estimated_mass     │
-│  [2] MoveIt2 ◄────────────────┐                                │            │
+│  [2] MoveIt2 ◄────────────────┐                                 │            │
 │       (move_group)             │                                │            │
 │            │                   │                                │            │
 │            ▼                   │                                │            │
-│  [3] Go Home ─────────┐       │                                │            │
+│  [3] Go Home ─────────┐       │                                 │            │
 │                        │       │                                │            │
 │  [4] Safety Viz ───────┼───────┼────────────────────────────────┤            │
 │                        │       │                                │            │
@@ -83,18 +85,23 @@ The system consists of 9 core nodes communicating through topics, services, and 
 │     /detected_objects  │       │                                │            │
 │            │           │       │                                │            │
 │            ▼           ▼       ▼                                ▼            │
-│  [9] Sorting Brain ─────────────────────────────────────────────────────────┤
+│  [9] Sorting Brain ──────────────────────────────────────────────────────────┤
 │    (supervisor_module)                                                       │
-│            │                                                                  │
-│            ├──────► /gripper_command ────────► [7] Gripper Controller       │
+│            │                                                                 │
+│            ├──────► /gripper_command ────────► [7] Gripper Controller        │
 │            │                                    (control_module)             │
-│            │                                                                  │
-│            └──────► /cartesian_goal ──────────► [8] Cartesian Controller    │
+│            │                                                                 │
+│            └──────► /cartesian_goal ──────────► [8] Cartesian Controller     │
 │                                                  (motion_control_module)     │
-│                                                           │                   │
+│                                                           │                  │
 │                                                           └─────► MoveIt2    │
-└─────────────────────────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
+The explicit graph can be found in [ROS2 Node / Topics Graph (rqt) ](####ROS2-Node-/-Topics-Graph-(rqt)).
+
+#### ROS2 Node / Topics Graph (rqt) 
+
+![Detailed ROS Node/Topics Graph from RQT](node_topic_diagram.png)
 
 ### Package-Level Architecture
 
@@ -105,46 +112,46 @@ The system consists of 9 core nodes communicating through topics, services, and 
          ▲
          │ (used by all packages)
          │
-┌────────┴───────────────────────────────────────────────────────────────┐
-│                                                                          │
-│  ┌──────────────┐  ┌───────────────┐  ┌────────────────┐              │
-│  │ supervisor_  │  │ perception_   │  │ weight_        │              │
-│  │ module       │  │ module        │  │ detection_     │              │
-│  │              │  │               │  │ module         │              │
-│  │ - brain_node │  │ - simulated_  │  │                │              │
-│  │ - simulated_ │  │   perception  │  │ - weight_      │              │
-│  │   perception │  │ - (Kevin's    │  │   detector     │              │
-│  │              │  │   real nodes) │  │                │              │
-│  └──────────────┘  └───────────────┘  └────────────────┘              │
-│         │                  │                   │                        │
-│         │                  │                   │                        │
-│  ┌──────┴──────────────────┴───────────────────┴──────────┐            │
-│  │                                                          │            │
-│  │              motion_control_module                      │            │
-│  │                                                          │            │
-│  │  - cartesian_controller_node                            │            │
-│  │  - go_home                                               │            │
-│  │  - safety_boundary_collision.py                          │            │
-│  │  - URDF/XACRO descriptions                               │            │
-│  │  - MoveIt configuration                                  │            │
-│  │                                                          │            │
-│  └──────────────────────────────────────────────────────────┘            │
-│                           │                                              │
-│                           ▼                                              │
-│  ┌────────────────────────────────────────────────────┐                 │
-│  │              control_module                        │                 │
-│  │                                                     │                 │
-│  │  - gripper_controller_node (lifecycle)             │                 │
-│  │                                                     │                 │
-│  └────────────────────────────────────────────────────┘                 │
-│                           │                                              │
-│                           ▼                                              │
-│  ┌────────────────────────────────────────────────────┐                 │
-│  │         util_arduino_serial                        │                 │
-│  │  (Serial communication utilities)                  │                 │
-│  └────────────────────────────────────────────────────┘                 │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
+┌────────┴────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│       ┌──────────────┐  ┌───────────────┐  ┌────────────────┐               │
+│       │ supervisor_  │  │ perception_   │  │ weight_        │               │
+│       │ module       │  │ module        │  │ detection_     │               │
+│       │              │  │               │  │ module         │               │
+│       │ - brain_node │  │ - simulated_  │  │                │               │
+│       │ - simulated_ │  │   perception  │  │ - weight_      │               │
+│       │   perception │  │ - (Kevin's    │  │   detector     │               │
+│       │              │  │   real nodes) │  │                │               │
+│       └──────────────┘  └───────────────┘  └────────────────┘               │
+│              │                  │                   │                       │
+│              │                  │                   │                       │
+│       ┌──────┴──────────────────┴───────────────────┴────────────┐          │
+│       │                                                          │          │
+│       │              motion_control_module                       │          │
+│       │                                                          │          │
+│       │  - cartesian_controller_node                             │          │
+│       │  - go_home                                               │          │
+│       │  - safety_boundary_collision.py                          │          │
+│       │  - URDF/XACRO descriptions                               │          │
+│       │  - MoveIt configuration                                  │          │
+│       │                                                          │          │
+│       └──────────────────────────────────────────────────────────┘          │
+│                                │                                            │
+│                                ▼                                            │
+│       ┌────────────────────────────────────────────────────┐                │
+│       │              control_module                        │                │
+│       │                                                    │                │
+│       │  - gripper_controller_node (lifecycle)             │                │
+│       │                                                    │                │
+│       └────────────────────────────────────────────────────┘                │
+│                                │                                            │
+│                                ▼                                            │
+│       ┌────────────────────────────────────────────────────┐                │
+│       │         util_arduino_serial                        │                │
+│       │  (Serial communication utilities)                  │                │
+│       └────────────────────────────────────────────────────┘                │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Node Descriptions
