@@ -225,7 +225,6 @@ The system consists of 9 core nodes communicating through topics, services, and 
 
 This package performs real-time object detection of **red cylindrical weights** using YOLOv8, extracts precise **3D coordinates** using Intel RealSense depth, transforms them into the **UR5e base frame**, and publishes both coordinates and weight estimation to downstream robot modules.
 
----
 
 ## 1. System Overview
 
@@ -242,7 +241,6 @@ This package performs real-time object detection of **red cylindrical weights** 
    - YOLO detections  
    - Top/table sampling points for height estimation
 
----
 
 ## 2. ROS2 Topics
 
@@ -270,7 +268,6 @@ For example:
 210.5,-145.2,85.0,200
 ```
 
----
 
 ## 3. Calculations & Coordinate Transforms
 
@@ -310,7 +307,6 @@ pt_base = do_transform_point(pt_cam, tf)
 
 Coordinates in base_link (meters) are published.
 
----
 
 ## 4. Weight Estimation Logic
 Object height is computed from depth:
@@ -331,7 +327,6 @@ Threshold → weight:
 
 These thresholds must be tuned using real measurements.
 
----
 
 ## 5. Visual Outputs
 OpenCV Windows:
@@ -351,7 +346,6 @@ base_link
          └── ...
 ```
 
----
 
 ## 6. How to Run
 ### A) Recommended (Launch File)
@@ -387,7 +381,6 @@ ros2 run perception_module object_detect_yolo \
   -p target_class_name:=red_object
 ```
 
----
 
 ## 7. Package Structure
 ```arduino
@@ -408,7 +401,6 @@ perception_module/
 └── README.md
 ```
 
----
 
 ## 8. Known Issues & Assumptions
 - Depth noise affects height estimation.
