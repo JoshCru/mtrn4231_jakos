@@ -746,10 +746,15 @@ source install/setup.bash
 
 2. **Startup Sequence (IMPORTANT - Follow in Order)**
 
-   **Step 1: Launch ROS2 System First**
+   **Step 1: Launch ROS2 System First (MODULAR - Recommended)**
    ```bash
    cd ~/Documents/mtrn4231_jakos
-   ./4231_scripts/runHybrid.sh 192.168.0.100  # or runRealRobot.sh
+   ./4231_scripts/modular/runHybridModular.sh 192.168.0.100  # or runRealModular.sh
+   ```
+
+   **Or using standard launch files:**
+   ```bash
+   ./4231_scripts/launch/runHybrid.sh 192.168.0.100  # or runRealRobot.sh
    ```
 
    **Step 2: Wait for System Ready**
@@ -843,7 +848,11 @@ Key configuration parameters are in:
 
 ## Running the System
 
-The system supports three operational modes via a unified launch file:
+The system supports three operational modes using **MODULAR** scripts (recommended) or standard launch files.
+
+### MODULAR System (Recommended)
+
+The MODULAR scripts provide enhanced modularity and flexibility for running the system.
 
 ### 1. Simulation Mode (No Hardware Required)
 
@@ -851,15 +860,15 @@ Full system simulation with fake robot, simulated perception, and simulated weig
 
 ```bash
 cd ~/Documents/mtrn4231_jakos
-./4231_scripts/runSimulation.sh
+./4231_scripts/modular/runSimulationModular.sh
 ```
 
-**Or using the launch file directly:**
+**Or using the standard launch file directly:**
 ```bash
-cd ~/Documents/mtrn4231_jakos/ros2_system
-source install/setup.bash
-ros2 launch full_system.launch.py mode:=simulation
+cd ~/Documents/mtrn4231_jakos
+./4231_scripts/launch/runSimulation.sh
 ```
+This simply uses the launch file without modular architecture.
 
 **Expected behaviour:**
 - Fake UR5e robot initialises in RViz
@@ -871,10 +880,10 @@ ros2 launch full_system.launch.py mode:=simulation
 
 Real robot with simulated perception for testing without camera:
 
-**Step 1: Launch ROS2 System**
+**Step 1: Launch ROS2 System (MODULAR)**
 ```bash
 cd ~/Documents/mtrn4231_jakos
-./4231_scripts/runHybrid.sh [ROBOT_IP] [--autorun] [--real-weight-detection]
+./4231_scripts/modular/runHybridModular.sh [ROBOT_IP] [--autorun] [--real-weight-detection]
 ```
 
 **Options:**
@@ -884,13 +893,15 @@ cd ~/Documents/mtrn4231_jakos
 
 **Example:**
 ```bash
-./4231_scripts/runHybrid.sh 192.168.0.100 --real-weight-detection
+./4231_scripts/modular/runHybridModular.sh 192.168.0.100 --real-weight-detection
 ```
 
-**Or using launch file:**
+**Or using the standard launch file directly:**
 ```bash
-ros2 launch full_system.launch.py mode:=hybrid robot_ip:=192.168.0.100 real_weight_detection:=true
+cd ~/Documents/mtrn4231_jakos
+./4231_scripts/launch/runHybrid.sh [ROBOT_IP] [--autorun] [--real-weight-detection]
 ```
+This simply uses the launch file without modular architecture.
 
 **Step 2: Wait for System Ready (~10 seconds)**
 - Monitor terminal for UR5e driver startup
@@ -925,21 +936,23 @@ Complete system with real robot, real perception, and real weight detection:
 - Workspace clear of obstacles
 - Camera calibrated and connected
 
-**Step 1: Launch ROS2 System**
+**Step 1: Launch ROS2 System (MODULAR)**
 ```bash
 cd ~/Documents/mtrn4231_jakos
-./4231_scripts/runRealRobot.sh [ROBOT_IP] [--autorun]
+./4231_scripts/modular/runRealModular.sh [ROBOT_IP] [--autorun]
 ```
 
 **Example:**
 ```bash
-./4231_scripts/runRealRobot.sh 192.168.0.100 --autorun
+./4231_scripts/modular/runRealModular.sh 192.168.0.100 --autorun
 ```
 
-**Or using launch file:**
+**Or using the standard launch file directly:**
 ```bash
-ros2 launch full_system.launch.py mode:=real robot_ip:=192.168.0.100
+cd ~/Documents/mtrn4231_jakos
+./4231_scripts/launch/runRealRobot.sh [ROBOT_IP] [--autorun]
 ```
+This simply uses the launch file without modular architecture.
 
 **Step 2: Wait for System Ready (~10 seconds)**
 - Monitor terminal for UR5e driver startup
@@ -976,14 +989,31 @@ ros2 topic echo /estimated_mass
 - Real weight detection via joint torques
 - Full closed-loop sorting cycle
 
+### Additional Tools and Utilities
+
+#### Dashboard UI
+Launch the interactive dashboard for system control and monitoring:
+```bash
+cd ~/Documents/mtrn4231_jakos
+./4231_scripts/launchDashboard.sh
+```
+
+#### Simple Pick and Weight Testing
+For easy weight detection testing without full system integration:
+```bash
+cd ~/Documents/mtrn4231_jakos
+./4231_scripts/runSimplePickAndWeigh.sh
+```
+This provides a simplified environment for testing and calibrating the weight detection system.
+
 ### Controlling the System
 
 #### Start Sorting (if not using `--autorun`)
 
 Launch the dashboard UI:
 ```bash
-cd ~/Documents/mtrn4231_jakos/4231_scripts
-./launchDashboard.sh
+cd ~/Documents/mtrn4231_jakos
+./4231_scripts/launchDashboard.sh
 ```
 
 Or manually trigger via topic:
@@ -1049,7 +1079,7 @@ The launch file orchestrates a timed startup sequence:
 ===========================================
    All systems launched!
 ===========================================
-To control the system, run: ./launchDashboard.sh
+To control the system, run: ./4231_scripts/launchDashboard.sh
 ```
 
 ### Monitoring System Status
@@ -1339,13 +1369,25 @@ Predominantly requiring more time testing with data representative of applicatio
 ```
 mtrn4231_jakos/
 ├── 4231_scripts/                    # Convenience launch scripts
-│   ├── runSimulation.sh             # Launch simulation mode
-│   ├── runHybrid.sh                 # Launch hybrid mode (real robot + sim perception)
-│   ├── runRealRobot.sh              # Launch full real system
-│   └── launchDashboard.sh           # Launch control dashboard UI
+│   ├── modular/                     # MODULAR system scripts (recommended)
+│   │   ├── runSimulationModular.sh  # Launch simulation mode (modular)
+│   │   ├── runHybridModular.sh      # Launch hybrid mode (modular)
+│   │   └── runRealModular.sh        # Launch full real system (modular)
+│   │
+│   ├── launch/                      # Standard launch file scripts
+│   │   ├── runSimulation.sh         # Launch simulation mode (launch file)
+│   │   ├── runHybrid.sh             # Launch hybrid mode (launch file)
+│   │   └── runRealRobot.sh          # Launch full real system (launch file)
+│   │
+│   ├── legacy/                      # Legacy setup scripts
+│   │   ├── setupFakeur5e.sh         # Setup fake UR5e
+│   │   └── setupRealur5e.sh         # Setup real UR5e
+│   │
+│   ├── launchDashboard.sh           # Launch control dashboard UI
+│   └── runSimplePickAndWeigh.sh     # Simple weight detection testing utility
 │
 ├── arduino/                         # Arduino sketches for gripper control
-│   └── gripper_controller/          # Servo gripper control code
+│   └── servo.ino/                   # Servo gripper control code
 │
 ├── ros2_system/                     # Main ROS2 workspace
 │   ├── launch/
@@ -1366,7 +1408,7 @@ mtrn4231_jakos/
 │       │   └── README.md
 │       │
 │       ├── perception_module/       # Vision system
-│       │   ├── src/                 # Object detection, point cloud processing
+│       │   ├── src/                 # Object detection
 │       │   └── README.md
 │       │
 │       ├── weight_detection_module/ # Torque-based weight estimation
@@ -1376,7 +1418,7 @@ mtrn4231_jakos/
 │       │   │   └── weight_detector_py.py
 │       │   └── README.md            
 │       │
-│       ├── motion_control_module/   # Robot motion and planning (Joshua's)
+│       ├── motion_control_module/   # Robot motion and planning
 │       │   ├── launch/
 │       │   │   └── ur5e_moveit_with_gripper.launch.py
 │       │   ├── urdf/                # Robot URDF/XACRO files
@@ -1393,10 +1435,9 @@ mtrn4231_jakos/
 │       │   └── README.md
 │       │
 │       ├── util_arduino_serial/     # Arduino serial utilities
-│       │   └── src/
-│       │
-│       ├── planning_module/         # (Future: advanced planning algorithms)
-│       └── recognition_module/      # (Future: object classification)
+│           └── src/
+│       
+│       
 │
 ├── rosbags2/                        # Test rosbag recordings
 │   ├── rosbag2_100_3cm_lift/        # 100g weight test
@@ -1406,12 +1447,6 @@ mtrn4231_jakos/
 ├── stl/                             # CAD files for gripper
 │
 ├── README.md                        # This file
-├── DEPENDENCIES.md                  # Detailed dependency documentation
-├── DASHBOARD_README.md              # Dashboard UI documentation
-├── GRIPPER_INTEGRATION.md           # Gripper assembly and integration
-├── WEIGHT_INTEGRATION.md            # Weight detection integration guide
-├── SYSTEM_MODES.md                  # Detailed mode descriptions
-└── SORTING_SYSTEM_PLAN.md           # System design documentation
 ```
 
 ### Key Files
