@@ -197,7 +197,7 @@ class SortingBrainNode(Node):
             callback_group=self.callback_group
         )
 
-        # Perception from Kevin
+        # Perception
         self.detected_objects_sub = self.create_subscription(
             DetectedObjects,
             '/perception/detected_objects',
@@ -206,7 +206,7 @@ class SortingBrainNode(Node):
             callback_group=self.callback_group
         )
 
-        # Weight estimation from Asad's weight_detection_module
+        # Weight estimation
         self.weight_estimate_sub = self.create_subscription(
             Int32,
             '/estimated_mass',

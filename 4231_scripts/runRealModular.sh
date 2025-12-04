@@ -64,7 +64,7 @@ echo ""
 echo "PREREQUISITES:"
 echo "  [✓] Robot powered on and booted"
 if [ "$SIM_PERCEPTION" = false ]; then
-    echo "  [✓] Kevin's perception nodes running"
+    echo "  [✓] Perception nodes running"
     echo "  [✓] Camera calibrated and connected"
 else
     echo "  [✓] Simulated perception will be launched"
@@ -171,7 +171,7 @@ if [ "$SIM_PERCEPTION" = true ]; then
     PERCEPTION_PID=$!
     sleep 2
 else
-    echo "[5/9] NOTE: Expecting Kevin's perception nodes to be running externally!"
+    echo "[5/9] NOTE: Expecting Perception nodes to be running externally!"
     echo "           Checking for /detected_objects topic..."
     timeout 5 ros2 topic echo /detected_objects --once 2>/dev/null && echo "Perception topic found!" || echo "Warning: /detected_objects not publishing yet"
     sleep 2

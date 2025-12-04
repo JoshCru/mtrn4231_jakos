@@ -70,21 +70,21 @@ The system consists of 9 core nodes communicating through topics, services, and 
 │            │                                                      │          │
 │            │                                                      ▼          │
 │            ▼                                             /estimated_mass     │
-│  [2] MoveIt2 ◄────────────────┐                                 │            │
-│       (move_group)             │                                │            │
-│            │                   │                                │            │
-│            ▼                   │                                │            │
-│  [3] Go Home ─────────┐       │                                 │            │
-│                        │       │                                │            │
-│  [4] Safety Viz ───────┼───────┼────────────────────────────────┤            │
-│                        │       │                                │            │
-│  [5] Perception ───────┼───────┼────────────────────────────────┤            │
-│    (simulated/real)    │       │                                │            │
-│            │           │       │                                │            │
-│            ▼           │       │                                │            │
-│     /detected_objects  │       │                                │            │
-│            │           │       │                                │            │
-│            ▼           ▼       ▼                                ▼            │
+│  [2] MoveIt2 ◄─────────────────┐                                 │           │
+│       (move_group)             │                                 │           │
+│            │                   │                                 │           │
+│            ▼                   │                                 │           │
+│  [3] Go Home ──────────┐       │                                 │           │
+│                        │       │                                 │           │
+│  [4] Safety Viz ───────┼───────┼─────────────────────────────────┤           │
+│                        │       │                                 │           │
+│  [5] Perception ───────┼───────┼─────────────────────────────────┤           │
+│    (simulated/real)    │       │                                 │           │
+│            │           │       │                                 │           │
+│            ▼           │       │                                 │           │
+│     /detected_objects  │       │                                 │           │
+│            │           │       │                                 │           │
+│            ▼           ▼       ▼                                 ▼           │
 │  [9] Sorting Brain ──────────────────────────────────────────────────────────┤
 │    (supervisor_module)                                                       │
 │            │                                                                 │
@@ -120,8 +120,9 @@ The explicit graph can be found in [ROS2 Node and Topics Graph (rqt)](#ros2-node
 │       │              │  │               │  │ module         │               │
 │       │ - brain_node │  │ - simulated_  │  │                │               │
 │       │ - simulated_ │  │   perception  │  │ - weight_      │               │
-│       │   perception │  │ - (Kevin's    │  │   detector     │               │
-│       │              │  │   real nodes) │  │                │               │
+│       │   perception │  │ - real_       │  │   detector     │               │
+│       │              │  │   perception  │  │                │               │
+│       │              │  │               │  │                │               │
 │       └──────────────┘  └───────────────┘  └────────────────┘               │
 │              │                  │                   │                       │
 │              │                  │                   │                       │
@@ -938,10 +939,10 @@ ros2 topic echo /joint_states  # Should show ~500Hz updates
 Complete system with real robot, real perception, and real weight detection:
 
 **Prerequisites:**
-- ✓ Robot powered on and booted
-- ✓ **Kevin's perception nodes running separately**
-- ✓ Workspace clear of obstacles
-- ✓ Camera calibrated and connected
+- Robot powered on and booted
+- Perception nodes running separately
+- Workspace clear of obstacles
+- Camera calibrated and connected
 
 **Step 1: Launch ROS2 System**
 ```bash
@@ -976,7 +977,7 @@ ros2 launch full_system.launch.py mode:=real robot_ip:=192.168.0.100
 # Check joint states
 ros2 topic echo /joint_states
 
-# Check perception (Kevin's nodes)
+# Check perception
 ros2 topic echo /detected_objects
 
 # Check weight detection
@@ -1306,7 +1307,7 @@ The system was designed to achieve:
 
 | Name | Role | Primary Responsibilities |
 |------|------|--------------------------|
-| **Joshua Cruddas** | System Integration Lead | Path planning, system visualisation, UI dashboard, sorting brain logic, ROS2 node integration, launch file orchestration, testing and debugging |
+| **Joshua** | System Integration Lead | Path planning, system visualisation, UI dashboard, sorting brain logic, ROS2 node integration, launch file orchestration, testing and debugging |
 | **Asad** | Hardware & Mechatronics | Custom gripper design and assembly, URDF/XACRO modelling, Arduino gripper control, weight detection module (joint torque-based estimation), servo calibration |
 | **Kevin** | Perception & Vision | RGBD camera integration, object detection and segmentation, point cloud processing, 3D object localisation, perception pipeline development |
 
@@ -1378,7 +1379,7 @@ mtrn4231_jakos/
 │       │   │   └── weight_detector.cpp
 │       │   ├── scripts/
 │       │   │   └── weight_detector_py.py
-│       │   └── README.md            # ⚠️ DO NOT MODIFY (Asad's documentation)
+│       │   └── README.md            # (Asad's documentation)
 │       │
 │       ├── motion_control_module/   # Robot motion and planning (Joshua's)
 │       │   ├── launch/

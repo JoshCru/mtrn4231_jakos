@@ -4,7 +4,7 @@
 #
 # Launches the sorting system with:
 # - REAL robot hardware
-# - REAL perception (Kevin's nodes - must run separately)
+# - REAL perception (must run separately)
 # - REAL weight detection (Asad's weight_detection_module - launched here)
 # - RViz visualization
 #
@@ -18,7 +18,7 @@
 #   --autorun   Automatically start sorting without dashboard
 #
 # PREREQUISITES:
-#   - Kevin's perception nodes must be running separately
+#   - Perception nodes must be running separately
 #   - Robot must be powered on and in remote control mode
 # =============================================================================
 
@@ -51,14 +51,14 @@ echo "==========================================="
 echo ""
 echo "Configuration:"
 echo "  Robot:      REAL ($ROBOT_IP)"
-echo "  Perception: REAL (Kevin's nodes - external)"
-echo "  Weights:    REAL (Asad's weight_detector - launched here)"
+echo "  Perception: REAL (external)"
+echo "  Weights:    REAL (weight-detector launched here)"
 echo "  Autorun:    $AUTORUN"
 echo ""
 echo "PREREQUISITES CHECK:"
 echo "  [ ] Robot powered on and in remote control mode"
 echo "  [ ] Robot at safe home position"
-echo "  [ ] Kevin's perception nodes running separately"
+echo "  [ ] Perception nodes running separately"
 echo "  [ ] Workspace clear of obstacles"
 echo ""
 read -p "All prerequisites met? Press Enter to continue or Ctrl+C to cancel..."

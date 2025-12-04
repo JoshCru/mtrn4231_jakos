@@ -11,7 +11,7 @@ Three modes available:
 2. HYBRID: Real robot + simulated perception + optional real weights
    ros2 launch full_system.launch.py mode:=hybrid robot_ip:=192.168.0.100
 
-3. REAL: Real robot + real perception (Kevin's) + real weights (Asad's)
+3. REAL: Real robot + real perception + real weights
    ros2 launch full_system.launch.py mode:=real robot_ip:=192.168.0.100
 
 Additional options:
@@ -214,7 +214,7 @@ def generate_launch_description():
         period=29.0,
         actions=[
             LogInfo(
-                msg='[5/9] NOTE: Expecting Kevin\'s perception nodes to be running externally!',
+                msg='[5/9] NOTE: Expecting Perception nodes to be running externally!',
                 condition=UnlessCondition(use_simulated_perception)
             )
         ]
