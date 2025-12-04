@@ -1370,16 +1370,16 @@ mtrn4231_jakos/
 │       │   │   └── simulated_perception_node.py
 │       │   └── README.md
 │       │
-│       ├── perception_module/       # Vision system (Kevin's)
+│       ├── perception_module/       # Vision system
 │       │   ├── src/                 # Object detection, point cloud processing
 │       │   └── README.md
 │       │
-│       ├── weight_detection_module/ # Torque-based weight estimation (Asad's)
+│       ├── weight_detection_module/ # Torque-based weight estimation
 │       │   ├── src/
 │       │   │   └── weight_detector.cpp
 │       │   ├── scripts/
 │       │   │   └── weight_detector_py.py
-│       │   └── README.md            # (Asad's documentation)
+│       │   └── README.md            
 │       │
 │       ├── motion_control_module/   # Robot motion and planning (Joshua's)
 │       │   ├── launch/

@@ -240,7 +240,7 @@ class SimulatedPerceptionNode(Node):
             weight = self.object_weights.get(msg.id, 100.0)
             self.get_logger().info(f'Removed object {msg.id} ({weight:.0f}g), {len(self.objects)} remaining')
 
-            # Publish the weight estimate for this object (matching Asad's format)
+            # Publish the weight estimate for this object (matching format)
             weight_msg = Int32()
             weight_msg.data = int(weight)
             self.weight_pub.publish(weight_msg)

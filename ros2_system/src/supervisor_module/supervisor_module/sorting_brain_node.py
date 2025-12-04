@@ -3,9 +3,9 @@
 Sorting Brain Node - Central Orchestrator for Weight Sorting System
 
 This node manages the full closed-loop sorting cycle:
-1. Wait for detected objects from perception (Kevin)
+1. Wait for detected objects from perception
 2. Pick up a weight from the picking area
-3. Wait for weight estimation from calibration (Asad)
+3. Wait for weight estimation from calibration
 4. Decide placement position based on sorted order
 5. Rearrange existing weights if needed
 6. Place the weight in the correct position
@@ -238,7 +238,7 @@ class SortingBrainNode(Node):
         self.status_pub = self.create_publisher(String, '/sorting/status', 10)
         self.state_pub = self.create_publisher(String, '/sorting/state', 10)
 
-        # Fake weight estimation publisher (for simulation without Asad's calibration node)
+        # Fake weight estimation publisher (for simulation without calibration node)
         self.fake_weight_pub = self.create_publisher(
             WeightEstimate,
             '/recognition/estimated_weights',
@@ -361,7 +361,7 @@ class SortingBrainNode(Node):
             self.get_logger().info(f'Detected {len(valid_objects)} objects in picking area')
 
     def weight_estimate_callback(self, msg: Int32):
-        """Handle weight estimate from Asad's weight_detection_module."""
+        """Handle weight estimate from weight_detection_module."""
         # Accept weight (no object_id matching needed as weight detector measures what's held)
         self.current_weight = float(msg.data)
         self.get_logger().info(f'Received weight estimate: {msg.data}g')

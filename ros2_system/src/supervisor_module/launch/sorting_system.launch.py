@@ -254,7 +254,7 @@ echo "FastDDS profile created at /tmp/fastdds_profile.xml"
         period=31.0,
         actions=[
             LogInfo(
-                msg='[6/9] Starting Real Weight Detection (Asad\'s module)...',
+                msg='[6/9] Starting Real Weight Detection...',
                 condition=IfCondition(use_real_weight)
             ),
             Node(

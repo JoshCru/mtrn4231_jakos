@@ -5,7 +5,7 @@
 # Launches the sorting system with:
 # - REAL robot hardware
 # - REAL perception (must run separately)
-# - REAL weight detection (Asad's weight_detection_module - launched here)
+# - REAL weight detection (weight_detection_module - launched here)
 # - RViz visualization
 #
 # Use this for the final integrated system.
