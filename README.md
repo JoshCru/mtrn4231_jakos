@@ -330,7 +330,7 @@ These thresholds must be tuned using real measurements.
 
 ## 5. Visual Outputs
 
-![CV image](cv_terminal.png "3D Coordinates & Yolov8 detected Objects")
+![CV image](cv_terminal.png "3D coordinates & Yolov8 detected objects")
 
 OpenCV Windows:
 - YOLO Detection
